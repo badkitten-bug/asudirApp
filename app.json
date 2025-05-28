@@ -1,13 +1,13 @@
 {
   "expo": {
     "name": "asudirApp",
-    "slug": "asudirApp",
+    "slug": "asudirapp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true
     },
@@ -55,8 +55,9 @@
         "origin": false
       },
       "eas": {
-        "projectId": "ee277461-47ea-4fbe-8ae1-8cdf059a6ede"
+        "projectId": "31573a87-e9b9-4c5e-a7cd-b0d03414af22"
       }
-    }
+    },
+    "owner": "stevegomez"
   }
 }

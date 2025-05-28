@@ -35,4 +35,8 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# Variables de entorno
+.env
+.env.*
+
 app-example

@@ -154,28 +154,40 @@ export const validateCredentials = createAsyncThunk(
       const availableUsers = state.auth.availableUsers
 
       console.log("Validando credenciales:", email, password)
-      console.log("Usuarios disponibles:", availableUsers)
-
-      // Buscar usuario con las credenciales proporcionadas
-
-      console.log("VEAMOS",availableUsers)
       
-      const foundUser = availableUsers.find((user) => user.email === email && user.password === password)
+      // Usar la variable de entorno para la URL del backend
+      const API_URL = process.env.EXPO_PUBLIC_API_URL
+      
+      if (!API_URL) {
+        throw new Error('La URL del backend no está configurada');
+      }
+      
+      // Llamar a la API de autenticación con plataforma mobile
+      const response = await fetch(`${API_URL}/api/auth/custom/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          identifier: email,
+          password: password,
+          platform: 'mobile'
+        })
+      });
 
-      if (!foundUser) {
-        console.log("Usuario no encontrado")
-        return null
-        /* throw new Error("Credenciales inválidas") */
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error en la autenticación');
       }
 
-      console.log("Usuario encontrado:", foundUser)
+      const data = await response.json();
 
-      // Crear objeto de usuario para la sesión (sin incluir la contraseña)
+      // Si la autenticación es exitosa, crear el objeto de usuario
       const userData: User = {
-        id: foundUser.id,
-        email: foundUser.email,
-        name: foundUser.name,
-        token: `fake-jwt-token-${Date.now()}`,
+        id: data.user.id,
+        email: data.user.email,
+        name: data.user.username,
+        token: data.jwt,
       }
 
       // Guardar el usuario en AsyncStorage
