@@ -718,16 +718,15 @@ export default function TicketScreen() {
           <div class="info-row">
             <span><b>Batería:</b> ${bateria?.nombrebateria ?? 'N/A'}</span>
             <span><b>Pozo:</b> ${pozo?.numeropozo ?? 'N/A'}</span>
+          </div>
+          
+          <div class="info-row">
             <span><b>Predio:</b> ${pozo?.predio ?? 'N/A'}</span>
           </div>
           
           <div class="info-row">
             <span><b>Fecha:</b> ${fecha}</span>
             <span><b>Hora:</b> ${hora}</span>
-          </div>
-          
-          <div class="info-row">
-            <span><b>Ubicación:</b> ${ubicacion}</span>
           </div>
           
           <div class="section-title">LECTURAS DEL MES:</div>
@@ -849,28 +848,29 @@ export default function TicketScreen() {
   }
   if (ticketDocumentId && ticketData && lecturaData) {
     // Obtener datos relacionados
-    const pozo = ticketData.attributes?.pozo?.data?.attributes;
-    const bateria = pozo?.bateria?.data?.attributes;
+    const lectura = ticketData.lectura;
+    const pozo = lectura?.pozo;
+    const bateria = pozo?.bateria;
     const lecturaAnterior = ticketData.lecturaAnterior;
     const eficienciaPromedioHistorica = ticketData.eficienciaPromedioHistorica;
     // Números de serie
-    const numeroSerieVol = mostrarValor(lecturaData.attributes?.numero_serie_volumetrico);
-    const numeroSerieElec = mostrarValor(lecturaData.attributes?.numero_serie_electrico);
+    const numeroSerieVol = mostrarValor(lectura?.numero_serie_volumetrico);
+    const numeroSerieElec = mostrarValor(lectura?.numero_serie_electrico);
     // Lecturas
-    const lecturaActualVol = mostrarValor(lecturaData.attributes?.volumen);
-    const lecturaAnteriorVol = mostrarValor(lecturaAnterior?.volumen);
-    const consumoVol = mostrarValor(lecturaData.attributes?.volumen - lecturaAnterior?.volumen);
-    const lecturaActualElec = mostrarValor(lecturaData.attributes?.lectura_electrica);
-    const lecturaAnteriorElec = mostrarValor(lecturaAnterior?.lectura_electrica);
-    const consumoElec = mostrarValor(lecturaData.attributes?.lectura_electrica - lecturaAnterior?.lectura_electrica);
-    const eficienciaActual = mostrarValor(lecturaData.attributes?.eficiencia, "N/A");
+    const lecturaActualVol = mostrarLectura(lectura?.volumen);
+    const lecturaAnteriorVol = lecturaAnterior ? mostrarLectura(lecturaAnterior?.volumen) : "Primera lectura";
+    const consumoVol = lecturaAnterior ? mostrarLectura(lectura?.volumen - lecturaAnterior?.volumen) : "No calculable (primera lectura)";
+    const lecturaActualElec = mostrarLectura(lectura?.lectura_electrica);
+    const lecturaAnteriorElec = lecturaAnterior ? mostrarLectura(lecturaAnterior?.lectura_electrica) : "Primera lectura";
+    const consumoElec = lecturaAnterior ? mostrarLectura(lectura?.lectura_electrica - lecturaAnterior?.lectura_electrica) : "No calculable (primera lectura)";
+    const eficienciaActual = lecturaAnterior ? mostrarLectura(lectura?.eficiencia) + " m³/kWh" : "Sin registro";
     // Ubicación
     const ubicacion = pozo && pozo.latitud && pozo.longitud ? `Lat ${pozo.latitud}, Long ${pozo.longitud}` : 'No disponible';
     // Observaciones
-    const observaciones = mostrarValor(lecturaData.attributes?.observaciones, "Sin observaciones");
+    const observaciones = mostrarValor(lectura?.observaciones, "Sin observaciones");
     // Anomalías
-    const anomaliasVol = Array.isArray(lecturaData.attributes?.anomalias_volumetrico) && lecturaData.attributes.anomalias_volumetrico.length > 0 ? lecturaData.attributes.anomalias_volumetrico.join(', ') : "Ninguna";
-    const anomaliasElec = Array.isArray(lecturaData.attributes?.anomalias_electrico) && lecturaData.attributes.anomalias_electrico.length > 0 ? lecturaData.attributes.anomalias_electrico.join(', ') : "Ninguna";
+    const anomaliasVol = Array.isArray(lectura?.anomalias_volumetrico) && lectura.anomalias_volumetrico.length > 0 ? lectura.anomalias_volumetrico.join(', ') : "Ninguna";
+    const anomaliasElec = Array.isArray(lectura?.anomalias_electrico) && lectura.anomalias_electrico.length > 0 ? lectura.anomalias_electrico.join(', ') : "Ninguna";
     return (
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
         <View style={styles.ticketContainer}>
@@ -880,6 +880,7 @@ export default function TicketScreen() {
             <Text style={styles.ticketTitle}>ASOCIACIÓN DE USUARIOS DEL DISTRITO DE RIEGO</Text>
             <Text style={styles.ticketTitle}>NÚMERO 051 COSTA DE HERMOSILLO, A.C.</Text>
           </View>
+
           {/* Info principal */}
           <View style={styles.infoRow}>
             <View style={styles.infoItem}>
@@ -890,7 +891,9 @@ export default function TicketScreen() {
               <Text style={styles.infoLabel}>Pozo:</Text>
               <Text style={styles.infoValue}>{pozo?.numeropozo ?? 'N/A'}</Text>
             </View>
-            <View style={styles.infoItem}>
+          </View>
+          <View style={styles.infoRow}>
+            <View style={[styles.infoItem, { flex: 1 }]}> 
               <Text style={styles.infoLabel}>Predio:</Text>
               <Text style={styles.infoValue}>{pozo?.predio ?? 'N/A'}</Text>
             </View>
@@ -898,11 +901,11 @@ export default function TicketScreen() {
           <View style={styles.infoRow}>
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Fecha:</Text>
-              <Text style={styles.infoValue}>{ticketData.attributes?.fecha?.split('T')[0]}</Text>
+              <Text style={styles.infoValue}>{ticketData.fecha?.split('T')[0]}</Text>
             </View>
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Hora:</Text>
-              <Text style={styles.infoValue}>{ticketData.attributes?.fecha?.split('T')[1]}</Text>
+              <Text style={styles.infoValue}>{ticketData.fecha?.split('T')[1]}</Text>
             </View>
           </View>
           {/* Separador visual */}
@@ -915,15 +918,15 @@ export default function TicketScreen() {
               <Text style={styles.readingTitle}>- Medidor Volumétrico: {numeroSerieVol}</Text>
               <View style={styles.readingRow}>
                 <Text style={styles.readingLabel}>Lectura Actual (m³):</Text>
-                <Text style={styles.readingValue}>{mostrarLectura(lecturaActualVol)}</Text>
+                <Text style={styles.readingValue}>{lecturaActualVol}</Text>
               </View>
               <View style={styles.readingRow}>
                 <Text style={styles.readingLabel}>Lectura Anterior (m³):</Text>
-                <Text style={styles.readingValue}>{mostrarLectura(lecturaAnteriorVol)}</Text>
+                <Text style={styles.readingValue}>{lecturaAnteriorVol}</Text>
               </View>
               <View style={styles.readingRow}>
                 <Text style={styles.readingLabel}>Consumo del Mes (m³):</Text>
-                <Text style={styles.readingValue}>{mostrarLectura(consumoVol)}</Text>
+                <Text style={styles.readingValue}>{consumoVol}</Text>
               </View>
               <Text style={styles.observation}>Anomalías: {anomaliasVol}</Text>
             </View>
@@ -932,15 +935,15 @@ export default function TicketScreen() {
               <Text style={styles.readingTitle}>- Medidor Eléctrico: {numeroSerieElec}</Text>
               <View style={styles.readingRow}>
                 <Text style={styles.readingLabel}>Lectura Actual (kWh):</Text>
-                <Text style={styles.readingValue}>{mostrarLectura(lecturaActualElec)}</Text>
+                <Text style={styles.readingValue}>{lecturaActualElec}</Text>
               </View>
               <View style={styles.readingRow}>
                 <Text style={styles.readingLabel}>Lectura Anterior (kWh):</Text>
-                <Text style={styles.readingValue}>{mostrarLectura(lecturaAnteriorElec)}</Text>
+                <Text style={styles.readingValue}>{lecturaAnteriorElec}</Text>
               </View>
               <View style={styles.readingRow}>
                 <Text style={styles.readingLabel}>Consumo del Mes (kWh):</Text>
-                <Text style={styles.readingValue}>{mostrarLectura(consumoElec)}</Text>
+                <Text style={styles.readingValue}>{consumoElec}</Text>
               </View>
               <Text style={styles.observation}>Anomalías: {anomaliasElec}</Text>
             </View>
@@ -952,11 +955,11 @@ export default function TicketScreen() {
             <Text style={styles.sectionTitle}>EFICIENCIA DETECTADA:</Text>
             <View style={styles.readingRow}>
               <Text style={styles.readingLabel}>Eficiencia Actual:</Text>
-              <Text style={styles.readingValue}>{mostrarLectura(eficienciaActual)} m³/kWh</Text>
+              <Text style={styles.readingValue}>{eficienciaActual}</Text>
             </View>
             <View style={styles.readingRow}>
               <Text style={styles.readingLabel}>Eficiencia Promedio Histórica:</Text>
-              <Text style={styles.readingValue}>{mostrarLectura(eficienciaPromedioHistorica)} m³/kWh</Text>
+              <Text style={styles.readingValue}>{eficienciaPromedioHistorica} m³/kWh</Text>
             </View>
           </View>
           {/* Separador visual */}
@@ -978,14 +981,14 @@ export default function TicketScreen() {
     const bateria = pozo?.bateria;
     const numeroSerieVol = mostrarValor(lectura.numero_serie_volumetrico);
     const numeroSerieElec = mostrarValor(lectura.numero_serie_electrico);
-    const lecturaActualVol = mostrarValor(lectura.volumen);
-    const lecturaAnteriorVol = mostrarValor(lecturaAnteriorDirecta?.volumen);
-    const consumoVol = lecturaAnteriorDirecta ? mostrarValor(lectura.volumen - lecturaAnteriorDirecta.volumen) : "N/A";
-    const lecturaActualElec = mostrarValor(lectura.lectura_electrica);
-    const lecturaAnteriorElec = mostrarValor(lecturaAnteriorDirecta?.lectura_electrica);
-    const consumoElec = lecturaAnteriorDirecta ? mostrarValor(lectura.lectura_electrica - lecturaAnteriorDirecta.lectura_electrica) : "N/A";
-    const eficienciaActual = mostrarValor(lectura.eficiencia, "N/A");
-    const eficienciaPromedioHistorica = mostrarValor(lectura.eficiencia_promedio_historica, "N/A");
+    const lecturaActualVol = mostrarLectura(lectura.volumen);
+    const lecturaAnteriorVol = mostrarLectura(lecturaAnteriorDirecta?.volumen);
+    const consumoVol = lecturaAnteriorDirecta ? mostrarLectura(lectura.volumen - lecturaAnteriorDirecta.volumen) : "N/A";
+    const lecturaActualElec = mostrarLectura(lectura.lectura_electrica);
+    const lecturaAnteriorElec = mostrarLectura(lecturaAnteriorDirecta?.lectura_electrica);
+    const consumoElec = lecturaAnteriorDirecta ? mostrarLectura(lectura.lectura_electrica - lecturaAnteriorDirecta.lectura_electrica) : "N/A";
+    const eficienciaActualPrev = lecturaAnteriorDirecta ? mostrarLectura(lectura.eficiencia) + " m³/kWh" : "Sin registro";
+    const eficienciaPromedioHistorica = mostrarLectura(lectura.eficiencia_promedio_historica);
     const anomaliasVol = Array.isArray(lectura.anomalias_volumetrico) && lectura.anomalias_volumetrico.length > 0 ? lectura.anomalias_volumetrico.join(', ') : "Ninguna";
     const anomaliasElec = Array.isArray(lectura.anomalias_electrico) && lectura.anomalias_electrico.length > 0 ? lectura.anomalias_electrico.join(', ') : "Ninguna";
     const observaciones = mostrarValor(lectura.observaciones, "Sin observaciones");
@@ -1012,7 +1015,9 @@ export default function TicketScreen() {
               <Text style={styles.infoLabel}>Pozo:</Text>
               <Text style={styles.infoValue}>{pozo?.numeropozo ?? 'N/A'}</Text>
             </View>
-            <View style={styles.infoItem}>
+          </View>
+          <View style={styles.infoRow}>
+            <View style={[styles.infoItem, { flex: 1 }]}> 
               <Text style={styles.infoLabel}>Predio:</Text>
               <Text style={styles.infoValue}>{pozo?.predio ?? 'N/A'}</Text>
             </View>
@@ -1043,15 +1048,15 @@ export default function TicketScreen() {
               <Text style={styles.readingTitle}>- Medidor Volumétrico: {numeroSerieVol}</Text>
               <View style={styles.readingRow}>
                 <Text style={styles.readingLabel}>Lectura Actual (m³):</Text>
-                <Text style={styles.readingValue}>{mostrarLectura(lecturaActualVol)}</Text>
+                <Text style={styles.readingValue}>{lecturaActualVol}</Text>
               </View>
               <View style={styles.readingRow}>
                 <Text style={styles.readingLabel}>Lectura Anterior (m³):</Text>
-                <Text style={styles.readingValue}>{lecturaAnteriorDirecta ? mostrarLectura(lecturaAnteriorVol) : 'Primera lectura'}</Text>
+                <Text style={styles.readingValue}>{lecturaAnteriorVol}</Text>
               </View>
               <View style={styles.readingRow}>
                 <Text style={styles.readingLabel}>Consumo del Mes (m³):</Text>
-                <Text style={styles.readingValue}>{lecturaAnteriorDirecta ? mostrarLectura(consumoVol) : 'N/A'}</Text>
+                <Text style={styles.readingValue}>{consumoVol}</Text>
               </View>
               <Text style={styles.observation}>Anomalías: {anomaliasVol}</Text>
             </View>
@@ -1060,15 +1065,15 @@ export default function TicketScreen() {
               <Text style={styles.readingTitle}>- Medidor Eléctrico: {numeroSerieElec}</Text>
               <View style={styles.readingRow}>
                 <Text style={styles.readingLabel}>Lectura Actual (kWh):</Text>
-                <Text style={styles.readingValue}>{mostrarLectura(lecturaActualElec)}</Text>
+                <Text style={styles.readingValue}>{lecturaActualElec}</Text>
               </View>
               <View style={styles.readingRow}>
                 <Text style={styles.readingLabel}>Lectura Anterior (kWh):</Text>
-                <Text style={styles.readingValue}>{lecturaAnteriorDirecta ? mostrarLectura(lecturaAnteriorElec) : 'Primera lectura'}</Text>
+                <Text style={styles.readingValue}>{lecturaAnteriorElec}</Text>
               </View>
               <View style={styles.readingRow}>
                 <Text style={styles.readingLabel}>Consumo del Mes (kWh):</Text>
-                <Text style={styles.readingValue}>{lecturaAnteriorDirecta ? mostrarLectura(consumoElec) : 'N/A'}</Text>
+                <Text style={styles.readingValue}>{consumoElec}</Text>
               </View>
               <Text style={styles.observation}>Anomalías: {anomaliasElec}</Text>
             </View>
@@ -1080,11 +1085,11 @@ export default function TicketScreen() {
             <Text style={styles.sectionTitle}>EFICIENCIA DETECTADA:</Text>
             <View style={styles.readingRow}>
               <Text style={styles.readingLabel}>Eficiencia Actual:</Text>
-              <Text style={styles.readingValue}>{mostrarLectura(eficienciaActual)} m³/kWh</Text>
+              <Text style={styles.readingValue}>{eficienciaActualPrev}</Text>
             </View>
             <View style={styles.readingRow}>
               <Text style={styles.readingLabel}>Eficiencia Promedio Histórica:</Text>
-              <Text style={styles.readingValue}>{mostrarLectura(eficienciaPromedioHistorica)} m³/kWh</Text>
+              <Text style={styles.readingValue}>{eficienciaPromedioHistorica} m³/kWh</Text>
             </View>
           </View>
           {/* Separador visual */}
@@ -1123,14 +1128,14 @@ export default function TicketScreen() {
   // Datos para mostrar en el ticket
   const numeroSerieVol = mostrarValor(lecturaActual?.numero_serie_volumetrico);
   const numeroSerieElec = mostrarValor(lecturaActual?.numero_serie_electrico);
-  const lecturaActualVol = mostrarValor(lecturaActual?.volumen);
-  const lecturaAnteriorVol = mostrarValor(lecturaAnterior?.volumen);
-  const consumoVol = lecturaAnterior ? mostrarValor(lecturaActual?.volumen - lecturaAnterior?.volumen) : "N/A";
-  const lecturaActualElec = mostrarValor(lecturaActual?.lectura_electrica);
-  const lecturaAnteriorElec = mostrarValor(lecturaAnterior?.lectura_electrica);
-  const consumoElec = lecturaAnterior ? mostrarValor(lecturaActual?.lectura_electrica - lecturaAnterior?.lectura_electrica) : "N/A";
-  const eficienciaActual = mostrarValor(lecturaActual?.eficiencia, "N/A");
-  const eficienciaPromedioHistorica = mostrarValor(lecturaActual?.eficiencia_promedio_historica, "N/A");
+  const lecturaActualVol = mostrarLectura(lecturaActual?.volumen);
+  const lecturaAnteriorVol = lecturaAnterior ? mostrarLectura(lecturaAnterior?.volumen) : "Primera lectura";
+  const consumoVol = lecturaAnterior ? mostrarLectura(lecturaActual?.volumen - lecturaAnterior?.volumen) : "No calculable (primera lectura)";
+  const lecturaActualElec = mostrarLectura(lecturaActual?.lectura_electrica);
+  const lecturaAnteriorElec = lecturaAnterior ? mostrarLectura(lecturaAnterior?.lectura_electrica) : "Primera lectura";
+  const consumoElec = lecturaAnterior ? mostrarLectura(lecturaActual?.lectura_electrica - lecturaAnterior?.lectura_electrica) : "No calculable (primera lectura)";
+  const eficienciaActual = lecturaAnterior ? mostrarLectura(lecturaActual?.eficiencia) + " m³/kWh" : "Sin registro";
+  const eficienciaPromedioHistorica = mostrarLectura(lecturaActual?.eficiencia_promedio_historica);
   const anomaliasVol = Array.isArray(lecturaActual?.anomalias_volumetrico) && lecturaActual.anomalias_volumetrico.length > 0 ? lecturaActual.anomalias_volumetrico.join(', ') : "Ninguna";
   const anomaliasElec = Array.isArray(lecturaActual?.anomalias_electrico) && lecturaActual.anomalias_electrico.length > 0 ? lecturaActual.anomalias_electrico.join(', ') : "Ninguna";
   const observaciones = mostrarValor(lecturaActual?.observaciones, "Sin observaciones");
@@ -1174,21 +1179,19 @@ export default function TicketScreen() {
             </View>
           </View>
           <View style={styles.infoRow}>
-            <View style={styles.infoItem}>
+            <View style={[styles.infoItem, { flex: 1 }]}> 
               <Text style={styles.infoLabel}>Predio:</Text>
               <Text style={styles.infoValue}>{pozo?.predio ?? 'N/A'}</Text>
             </View>
           </View>
-
-          {/* Fecha y hora */}
           <View style={styles.infoRow}>
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Fecha:</Text>
-              <Text style={styles.infoValue}>{fecha}</Text>
+              <Text style={styles.infoValue}>{ticketData.fecha?.split('T')[0]}</Text>
             </View>
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Hora:</Text>
-              <Text style={styles.infoValue}>{hora}</Text>
+              <Text style={styles.infoValue}>{ticketData.fecha?.split('T')[1]}</Text>
             </View>
           </View>
 
@@ -1208,15 +1211,15 @@ export default function TicketScreen() {
               <Text style={styles.readingTitle}>- Medidor Volumétrico: {numeroSerieVol}</Text>
               <View style={styles.readingRow}>
                 <Text style={styles.readingLabel}>Lectura Actual (m³):</Text>
-                <Text style={styles.readingValue}>{mostrarLectura(lecturaActualVol)}</Text>
+                <Text style={styles.readingValue}>{lecturaActualVol}</Text>
               </View>
               <View style={styles.readingRow}>
                 <Text style={styles.readingLabel}>Lectura Anterior (m³):</Text>
-                <Text style={styles.readingValue}>{lecturaAnteriorDirecta ? mostrarLectura(lecturaAnteriorVol) : 'Primera lectura'}</Text>
+                <Text style={styles.readingValue}>{lecturaAnteriorVol}</Text>
               </View>
               <View style={styles.readingRow}>
                 <Text style={styles.readingLabel}>Consumo del Mes (m³):</Text>
-                <Text style={styles.readingValue}>{lecturaAnteriorDirecta ? mostrarLectura(consumoVol) : 'N/A'}</Text>
+                <Text style={styles.readingValue}>{consumoVol}</Text>
               </View>
               <Text style={styles.observation}>Anomalías: {anomaliasVol}</Text>
             </View>
@@ -1226,15 +1229,15 @@ export default function TicketScreen() {
               <Text style={styles.readingTitle}>- Medidor Eléctrico: {numeroSerieElec}</Text>
               <View style={styles.readingRow}>
                 <Text style={styles.readingLabel}>Lectura Actual (kWh):</Text>
-                <Text style={styles.readingValue}>{mostrarLectura(lecturaActualElec)}</Text>
+                <Text style={styles.readingValue}>{lecturaActualElec}</Text>
               </View>
               <View style={styles.readingRow}>
                 <Text style={styles.readingLabel}>Lectura Anterior (kWh):</Text>
-                <Text style={styles.readingValue}>{lecturaAnteriorDirecta ? mostrarLectura(lecturaAnteriorElec) : 'Primera lectura'}</Text>
+                <Text style={styles.readingValue}>{lecturaAnteriorElec}</Text>
               </View>
               <View style={styles.readingRow}>
                 <Text style={styles.readingLabel}>Consumo del Mes (kWh):</Text>
-                <Text style={styles.readingValue}>{lecturaAnteriorDirecta ? mostrarLectura(consumoElec) : 'N/A'}</Text>
+                <Text style={styles.readingValue}>{consumoElec}</Text>
               </View>
               <Text style={styles.observation}>Anomalías: {anomaliasElec}</Text>
             </View>
@@ -1246,11 +1249,11 @@ export default function TicketScreen() {
             <Text style={styles.sectionTitle}>EFICIENCIA DETECTADA:</Text>
             <View style={styles.readingRow}>
               <Text style={styles.readingLabel}>Eficiencia Actual:</Text>
-              <Text style={styles.readingValue}>{mostrarLectura(eficienciaActual)} m³/kWh</Text>
+              <Text style={styles.readingValue}>{eficienciaActual}</Text>
             </View>
             <View style={styles.readingRow}>
               <Text style={styles.readingLabel}>Eficiencia Promedio Histórica:</Text>
-              <Text style={styles.readingValue}>{mostrarLectura(eficienciaPromedioHistorica)} m³/kWh</Text>
+              <Text style={styles.readingValue}>{eficienciaPromedioHistorica} m³/kWh</Text>
             </View>
           </View>
           {/* Separador visual */}

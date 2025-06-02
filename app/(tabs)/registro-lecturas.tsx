@@ -100,7 +100,7 @@ export default function RegistroLecturasScreen() {
           lecturaElectrica: l.lectura_electrica ?? 'No disponible',
           observaciones: l.observaciones ?? 'Sin observaciones',
           ticketNumero: l.ticket?.numeroTicket ?? 'No disponible',
-          ticketId: l.ticket?.id ?? null,
+          ticketId: l.ticket?.documentId ?? null,
           pozoId: l.pozo?.id,
         }))
         setLecturas(lecturasMapped)
