@@ -27,7 +27,7 @@ import * as MediaLibrary from "expo-media-library"
 import ViewShot from "react-native-view-shot"
 import { addTicket, selectAllTickets } from "../../store/ticketsSlice"
 
-const STATUSBAR_HEIGHT = Constants.statusBarHeight || 0
+const STATUSBAR_HEIGHT = Constants.statusBarHeight ?? 0
 const { width: SCREEN_WIDTH } = Dimensions.get("window")
 
 // Datos de ejemplo para los gráficos
@@ -89,22 +89,23 @@ export default function TicketScreen() {
   const [ticketUri, setTicketUri] = useState<string | null>(null)
   const [ticketSaved, setTicketSaved] = useState(false)
   const allTickets = useSelector(selectAllTickets)
+  const ticketDocumentId = (params.ticketDocumentId as string) ?? null;
+  const [ticketData, setTicketData] = useState<any>(null);
+  const [lecturaData, setLecturaData] = useState<any>(null);
+  const [loadingTicket, setLoadingTicket] = useState(false);
+  const [pozoData, setPozoData] = useState<any>(null);
+  const [loadingPozoData, setLoadingPozoData] = useState(false);
+  const user = useSelector((state: any) => state.auth.user);
+  const lecturaId = (params.lecturaId as string) ?? null;
+  const [lecturaActualDirecta, setLecturaActualDirecta] = useState<any>(null);
+  const [lecturaAnteriorDirecta, setLecturaAnteriorDirecta] = useState<any>(null);
 
   // Modificar para asegurar que siempre haya datos, incluso si no se pasan parámetros
   // Datos del pozo y lecturas
-  const pozoId = (params.pozoId as string) || "1003"
-  const pozoNombre = (params.pozoNombre as string) || "Pozo 1003"
-  const pozoUbicacion = (params.pozoUbicacion as string) || "LA ESPERANZA"
-  const lecturaVolumen = (params.lecturaVolumen as string) || "255000"
-  const lecturaVolumenAnterior = "250000" // Simulado
-  const lecturaElectrica = (params.lecturaElectrica as string) || "480"
-  const lecturaElectricaAnterior = "470" // Simulado
-  const cargaMotor = (params.cargaMotor as string) || "15.5"
-  const gastoPozo = (params.gastoPozo as string) || "12500"
-  const observaciones = (params.observaciones as string) || "Sin anomalías"
+  const pozoId = (params.pozoId as string) ?? "1003"
   const fecha = new Date().toISOString().split("T")[0]
   const hora = new Date().toTimeString().split(" ")[0]
-  const ticketId = (params.ticketId as string) || ""
+  const ticketId = (params.ticketId as string) ?? ""
 
   // Verificar si el ticket ya existe
   useEffect(() => {
@@ -118,20 +119,102 @@ export default function TicketScreen() {
     const existingTicket = allTickets.find(
       (t) =>
         t.pozoId === pozoId &&
-        t.lecturaVolumen === lecturaVolumen &&
-        t.lecturaElectrica === lecturaElectrica &&
-        t.fecha === fecha,
+        t.fecha === fecha
     )
 
     if (existingTicket) {
       setTicketSaved(true)
     }
-  }, [allTickets, pozoId, lecturaVolumen, lecturaElectrica, fecha, ticketId])
+  }, [allTickets, pozoId, fecha, ticketId])
 
-  // Cálculos
-  const consumoVolumen = Number.parseInt(lecturaVolumen) - Number.parseInt(lecturaVolumenAnterior)
-  const consumoElectrico = Number.parseInt(lecturaElectrica) - Number.parseInt(lecturaElectricaAnterior)
-  const eficienciaActual = consumoElectrico > 0 ? (consumoVolumen / consumoElectrico).toFixed(1) : "N/A"
+  useEffect(() => {
+    const fetchTicket = async () => {
+      if (!ticketDocumentId || !user?.token) return;
+      setLoadingTicket(true);
+      try {
+        const res = await fetch(
+          `${process.env.EXPO_PUBLIC_API_URL}/api/tickets/${ticketDocumentId}?populate[lectura]=true&populate[pozo]=true`,
+          {
+            headers: { 'Authorization': `Bearer ${user.token}` }
+          }
+        );
+        const data = await res.json();
+        setTicketData(data.data);
+        setLecturaData(data.data?.lectura);
+      } catch (e) {
+        setTicketData(null);
+        setLecturaData(null);
+      } finally {
+        setLoadingTicket(false);
+      }
+    };
+    if (ticketDocumentId) fetchTicket();
+  }, [ticketDocumentId, user?.token]);
+
+  useEffect(() => {
+    const fetchLecturaDirecta = async () => {
+      if (!lecturaId || !user?.token) return;
+      setLoadingPozoData(true);
+      try {
+        const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/lectura-pozos/${lecturaId}?populate[pozo]=true`, {
+          headers: { 'Authorization': `Bearer ${user.token}` }
+        });
+        const data = await res.json();
+        setLecturaActualDirecta(data);
+        // Buscar la lectura anterior (puedes ajustar esto según tu backend)
+        // Si el backend ya la envía como lectura_anterior, úsala:
+        setLecturaAnteriorDirecta(data.lectura_anterior ?? null);
+      } catch (e) {
+        setLecturaActualDirecta(null);
+        setLecturaAnteriorDirecta(null);
+      } finally {
+        setLoadingPozoData(false);
+      }
+    };
+    if (lecturaId) fetchLecturaDirecta();
+  }, [lecturaId, user?.token]);
+
+  // Función para obtener los datos del pozo y sus lecturas
+  const fetchPozoData = async (pozoId: string) => {
+    if (!pozoId || !user?.token) return;
+    setLoadingPozoData(true);
+    try {
+      // Obtener datos del pozo incluyendo batería y última lectura
+      const res = await fetch(
+        `${process.env.EXPO_PUBLIC_API_URL}/api/pozos/${pozoId}?populate[bateria]=true&populate[lecturas][sort]=fecha:desc&populate[lecturas][limit]=2`,
+        {
+          headers: { 'Authorization': `Bearer ${user.token}` }
+        }
+      );
+      const data = await res.json();
+      
+      if (data.data) {
+        setPozoData(data.data);
+        // Si hay lecturas, la primera es la actual y la segunda la anterior
+        if (data.data.attributes?.lecturas?.data?.length > 0) {
+          setLecturaData(data.data.attributes.lecturas.data[0]);
+        }
+      }
+    } catch (error) {
+      console.error("Error al obtener datos del pozo:", error);
+      dispatch(
+        showSnackbar({
+          message: "Error al obtener datos del pozo",
+          type: "error",
+          duration: 3000,
+        })
+      );
+    } finally {
+      setLoadingPozoData(false);
+    }
+  };
+
+  // Efecto para cargar los datos del pozo cuando cambia el pozoId
+  useEffect(() => {
+    if (pozoId && !ticketDocumentId) {
+      fetchPozoData(pozoId);
+    }
+  }, [pozoId, ticketDocumentId]);
 
   // Función para volver al Panel de Control
   const handleBack = () => {
@@ -152,12 +235,12 @@ export default function TicketScreen() {
     const newTicket = {
       id: uniqueId,
       pozoId,
-      pozoNombre,
-      pozoUbicacion,
-      lecturaVolumen,
-      lecturaElectrica,
-      cargaMotor,
-      gastoPozo,
+      pozoNombre: pozo?.numeropozo ?? 'N/A',
+      pozoUbicacion: pozo?.predio ?? 'N/A',
+      lecturaVolumen: lecturaActualVol,
+      lecturaElectrica: lecturaActualElec,
+      cargaMotor: lecturaActual?.carga_motor ?? 'N/A',
+      gastoPozo: lecturaActual?.gasto_pozo ?? 'N/A',
       observaciones,
       fecha,
       hora,
@@ -340,9 +423,9 @@ export default function TicketScreen() {
           </div>
           
           <div class="info-row">
-            <span><b>Batería:</b> #3</span>
-            <span><b>Pozo:</b> ${pozoId}</span>
-            <span><b>Predio:</b> ${pozoUbicacion}</span>
+            <span><b>Batería:</b> ${bateria?.nombrebateria ?? 'N/A'}</span>
+            <span><b>Pozo:</b> ${pozo?.numeropozo ?? 'N/A'}</span>
+            <span><b>Predio:</b> ${pozo?.predio ?? 'N/A'}</span>
           </div>
           
           <div class="info-row">
@@ -351,42 +434,43 @@ export default function TicketScreen() {
           </div>
           
           <div class="info-row">
-            <span><b>Ubicación:</b> Lat 28.930000, Long -111.570000</span>
+            <span><b>Ubicación:</b> ${ubicacion}</span>
           </div>
           
           <div class="section-title">LECTURAS DEL MES:</div>
           
           <div class="reading-container">
-            <div class="reading-title">- Medidor Volumétrico: No.55555666</div>
+            <div class="reading-title">- Medidor Volumétrico: ${numeroSerieVol}</div>
             <div class="reading-row">
               <span>Lectura Actual (m³):</span>
-              <span>${Number.parseInt(lecturaVolumen).toLocaleString()}</span>
+              <span>${Number(lecturaActualVol).toLocaleString()}</span>
             </div>
             <div class="reading-row">
               <span>Lectura Anterior (m³):</span>
-              <span>${Number.parseInt(lecturaVolumenAnterior).toLocaleString()}</span>
+              <span>${Number(lecturaAnteriorVol).toLocaleString()}</span>
             </div>
             <div class="reading-row">
               <span>Consumo del Mes (m³):</span>
-              <span>${consumoVolumen.toLocaleString()} (0.0 M/h)</span>
+              <span>${Number(consumoVol).toLocaleString()}</span>
             </div>
+            <div class="observation">Anomalías: ${anomaliasVol}</div>
           </div>
           
           <div class="reading-container">
-            <div class="reading-title">- Medidor Eléctrico: No.66655555</div>
+            <div class="reading-title">- Medidor Eléctrico: ${numeroSerieElec}</div>
             <div class="reading-row">
               <span>Lectura Actual (kWh):</span>
-              <span>${lecturaElectrica}</span>
+              <span>${Number(lecturaActualElec).toLocaleString()}</span>
             </div>
             <div class="reading-row">
               <span>Lectura Anterior (kWh):</span>
-              <span>${lecturaElectricaAnterior}</span>
+              <span>${Number(lecturaAnteriorElec).toLocaleString()}</span>
             </div>
             <div class="reading-row">
               <span>Consumo del Mes (kWh):</span>
-              <span>${consumoElectrico}</span>
+              <span>${Number(consumoElec).toLocaleString()}</span>
             </div>
-            <div class="observation">Observaciones: ${observaciones}</div>
+            <div class="observation">Anomalías: ${anomaliasElec}</div>
           </div>
           
           <div class="section-title">EFICIENCIA DETECTADA:</div>
@@ -396,28 +480,21 @@ export default function TicketScreen() {
           </div>
           <div class="reading-row">
             <span>Eficiencia Promedio Histórica:</span>
-            <span>383.57 m³/kWh</span>
+            <span>${eficienciaPromedioHistorica} m³/kWh</span>
           </div>
           
           <div class="section-title">INFORMACIÓN ADICIONAL:</div>
           <div class="reading-row">
             <span>Carga del Motor:</span>
-            <span>${cargaMotor} A</span>
+            <span>${lecturaActual?.carga_motor ?? 'N/A'} A</span>
           </div>
           <div class="reading-row">
             <span>Gasto del Pozo:</span>
-            <span>${gastoPozo || "N/A"} L</span>
+            <span>${lecturaActual?.gasto_pozo ?? 'N/A'} L</span>
           </div>
           
-          <div class="section-title">HISTORIAL DE CONSUMO (12 MESES + ACTUAL):</div>
-          ${volChartHTML}
-          ${elecChartHTML}
-          
-          <div class="section-title">HISTORIAL DE EFICIENCIA (12 MESES + ACTUAL):</div>
-          ${eficChartHTML}
-          
           <div class="section-title">OBSERVACIONES GENERALES:</div>
-          <p>${observaciones || "Sin observaciones adicionales."}</p>
+          <p>${observaciones  ?? "No se registraron observaciones"}</p>
         </body>
       </html>
       `
@@ -639,9 +716,9 @@ export default function TicketScreen() {
           </div>
           
           <div class="info-row">
-            <span><b>Batería:</b> #3</span>
-            <span><b>Pozo:</b> ${pozoId}</span>
-            <span><b>Predio:</b> ${pozoUbicacion}</span>
+            <span><b>Batería:</b> ${bateria?.nombrebateria ?? 'N/A'}</span>
+            <span><b>Pozo:</b> ${pozo?.numeropozo ?? 'N/A'}</span>
+            <span><b>Predio:</b> ${pozo?.predio ?? 'N/A'}</span>
           </div>
           
           <div class="info-row">
@@ -650,42 +727,43 @@ export default function TicketScreen() {
           </div>
           
           <div class="info-row">
-            <span><b>Ubicación:</b> Lat 28.930000, Long -111.570000</span>
+            <span><b>Ubicación:</b> ${ubicacion}</span>
           </div>
           
           <div class="section-title">LECTURAS DEL MES:</div>
           
           <div class="reading-container">
-            <div class="reading-title">- Medidor Volumétrico: No.55555666</div>
+            <div class="reading-title">- Medidor Volumétrico: ${numeroSerieVol}</div>
             <div class="reading-row">
               <span>Lectura Actual (m³):</span>
-              <span>${Number.parseInt(lecturaVolumen).toLocaleString()}</span>
+              <span>${Number(lecturaActualVol).toLocaleString()}</span>
             </div>
             <div class="reading-row">
               <span>Lectura Anterior (m³):</span>
-              <span>${Number.parseInt(lecturaVolumenAnterior).toLocaleString()}</span>
+              <span>${Number(lecturaAnteriorVol).toLocaleString()}</span>
             </div>
             <div class="reading-row">
               <span>Consumo del Mes (m³):</span>
-              <span>${consumoVolumen.toLocaleString()} (0.0 M/h)</span>
+              <span>${Number(consumoVol).toLocaleString()}</span>
             </div>
+            <div class="observation">Anomalías: ${anomaliasVol}</div>
           </div>
           
           <div class="reading-container">
-            <div class="reading-title">- Medidor Eléctrico: No.66655555</div>
+            <div class="reading-title">- Medidor Eléctrico: ${numeroSerieElec}</div>
             <div class="reading-row">
               <span>Lectura Actual (kWh):</span>
-              <span>${lecturaElectrica}</span>
+              <span>${Number(lecturaActualElec).toLocaleString()}</span>
             </div>
             <div class="reading-row">
               <span>Lectura Anterior (kWh):</span>
-              <span>${lecturaElectricaAnterior}</span>
+              <span>${Number(lecturaAnteriorElec).toLocaleString()}</span>
             </div>
             <div class="reading-row">
               <span>Consumo del Mes (kWh):</span>
-              <span>${consumoElectrico}</span>
+              <span>${Number(consumoElec).toLocaleString()}</span>
             </div>
-            <div class="observation">Observaciones: ${observaciones}</div>
+            <div class="observation">Anomalías: ${anomaliasElec}</div>
           </div>
           
           <div class="section-title">EFICIENCIA DETECTADA:</div>
@@ -695,28 +773,21 @@ export default function TicketScreen() {
           </div>
           <div class="reading-row">
             <span>Eficiencia Promedio Histórica:</span>
-            <span>383.57 m³/kWh</span>
+            <span>${eficienciaPromedioHistorica} m³/kWh</span>
           </div>
           
           <div class="section-title">INFORMACIÓN ADICIONAL:</div>
           <div class="reading-row">
             <span>Carga del Motor:</span>
-            <span>${cargaMotor} A</span>
+            <span>${lecturaActual?.carga_motor ?? 'N/A'} A</span>
           </div>
           <div class="reading-row">
             <span>Gasto del Pozo:</span>
-            <span>${gastoPozo || "N/A"} L</span>
+            <span>${lecturaActual?.gasto_pozo ?? 'N/A'} L</span>
           </div>
           
-          <div class="section-title">HISTORIAL DE CONSUMO (12 MESES + ACTUAL):</div>
-          ${volChartHTML}
-          ${elecChartHTML}
-          
-          <div class="section-title">HISTORIAL DE EFICIENCIA (12 MESES + ACTUAL):</div>
-          ${eficChartHTML}
-          
           <div class="section-title">OBSERVACIONES GENERALES:</div>
-          <p>${observaciones || "Sin observaciones adicionales."}</p>
+          <p>${observaciones}</p>
         </body>
       </html>
       `
@@ -765,6 +836,306 @@ export default function TicketScreen() {
     }
   }
 
+  // Función para mostrar valores de forma profesional
+  const mostrarValor = (valor: any, textoSiNoHay = "N/A") =>
+    valor !== undefined && valor !== null && valor !== "" ? valor : textoSiNoHay;
+
+  const mostrarLectura = (lectura: any, textoSiNoHay = "Sin registro") =>
+    lectura !== undefined && lectura !== null ? Number(lectura).toLocaleString() : textoSiNoHay;
+
+  // Renderizado condicional
+  if (loadingTicket || loadingPozoData) {
+    return <ActivityIndicator size="large" color="#00A86B" style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }} />;
+  }
+  if (ticketDocumentId && ticketData && lecturaData) {
+    // Obtener datos relacionados
+    const pozo = ticketData.attributes?.pozo?.data?.attributes;
+    const bateria = pozo?.bateria?.data?.attributes;
+    const lecturaAnterior = ticketData.lecturaAnterior;
+    const eficienciaPromedioHistorica = ticketData.eficienciaPromedioHistorica;
+    // Números de serie
+    const numeroSerieVol = mostrarValor(lecturaData.attributes?.numero_serie_volumetrico);
+    const numeroSerieElec = mostrarValor(lecturaData.attributes?.numero_serie_electrico);
+    // Lecturas
+    const lecturaActualVol = mostrarValor(lecturaData.attributes?.volumen);
+    const lecturaAnteriorVol = mostrarValor(lecturaAnterior?.volumen);
+    const consumoVol = mostrarValor(lecturaData.attributes?.volumen - lecturaAnterior?.volumen);
+    const lecturaActualElec = mostrarValor(lecturaData.attributes?.lectura_electrica);
+    const lecturaAnteriorElec = mostrarValor(lecturaAnterior?.lectura_electrica);
+    const consumoElec = mostrarValor(lecturaData.attributes?.lectura_electrica - lecturaAnterior?.lectura_electrica);
+    const eficienciaActual = mostrarValor(lecturaData.attributes?.eficiencia, "N/A");
+    // Ubicación
+    const ubicacion = pozo && pozo.latitud && pozo.longitud ? `Lat ${pozo.latitud}, Long ${pozo.longitud}` : 'No disponible';
+    // Observaciones
+    const observaciones = mostrarValor(lecturaData.attributes?.observaciones, "Sin observaciones");
+    // Anomalías
+    const anomaliasVol = Array.isArray(lecturaData.attributes?.anomalias_volumetrico) && lecturaData.attributes.anomalias_volumetrico.length > 0 ? lecturaData.attributes.anomalias_volumetrico.join(', ') : "Ninguna";
+    const anomaliasElec = Array.isArray(lecturaData.attributes?.anomalias_electrico) && lecturaData.attributes.anomalias_electrico.length > 0 ? lecturaData.attributes.anomalias_electrico.join(', ') : "Ninguna";
+    return (
+      <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+        <View style={styles.ticketContainer}>
+          {/* Encabezado */}
+          <View style={styles.ticketHeader}>
+            <Text style={styles.ticketNumber}>051</Text>
+            <Text style={styles.ticketTitle}>ASOCIACIÓN DE USUARIOS DEL DISTRITO DE RIEGO</Text>
+            <Text style={styles.ticketTitle}>NÚMERO 051 COSTA DE HERMOSILLO, A.C.</Text>
+          </View>
+          {/* Info principal */}
+          <View style={styles.infoRow}>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Batería:</Text>
+              <Text style={styles.infoValue}>{bateria?.nombrebateria ?? 'N/A'}</Text>
+            </View>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Pozo:</Text>
+              <Text style={styles.infoValue}>{pozo?.numeropozo ?? 'N/A'}</Text>
+            </View>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Predio:</Text>
+              <Text style={styles.infoValue}>{pozo?.predio ?? 'N/A'}</Text>
+            </View>
+          </View>
+          <View style={styles.infoRow}>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Fecha:</Text>
+              <Text style={styles.infoValue}>{ticketData.attributes?.fecha?.split('T')[0]}</Text>
+            </View>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Hora:</Text>
+              <Text style={styles.infoValue}>{ticketData.attributes?.fecha?.split('T')[1]}</Text>
+            </View>
+          </View>
+          {/* Separador visual */}
+          <Text style={styles.separator}>----------------------------------------------------</Text>
+          {/* Lecturas del mes */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>LECTURAS DEL MES:</Text>
+            {/* Medidor Volumétrico */}
+            <View style={styles.readingContainer}>
+              <Text style={styles.readingTitle}>- Medidor Volumétrico: {numeroSerieVol}</Text>
+              <View style={styles.readingRow}>
+                <Text style={styles.readingLabel}>Lectura Actual (m³):</Text>
+                <Text style={styles.readingValue}>{mostrarLectura(lecturaActualVol)}</Text>
+              </View>
+              <View style={styles.readingRow}>
+                <Text style={styles.readingLabel}>Lectura Anterior (m³):</Text>
+                <Text style={styles.readingValue}>{mostrarLectura(lecturaAnteriorVol)}</Text>
+              </View>
+              <View style={styles.readingRow}>
+                <Text style={styles.readingLabel}>Consumo del Mes (m³):</Text>
+                <Text style={styles.readingValue}>{mostrarLectura(consumoVol)}</Text>
+              </View>
+              <Text style={styles.observation}>Anomalías: {anomaliasVol}</Text>
+            </View>
+            {/* Medidor Eléctrico */}
+            <View style={styles.readingContainer}>
+              <Text style={styles.readingTitle}>- Medidor Eléctrico: {numeroSerieElec}</Text>
+              <View style={styles.readingRow}>
+                <Text style={styles.readingLabel}>Lectura Actual (kWh):</Text>
+                <Text style={styles.readingValue}>{mostrarLectura(lecturaActualElec)}</Text>
+              </View>
+              <View style={styles.readingRow}>
+                <Text style={styles.readingLabel}>Lectura Anterior (kWh):</Text>
+                <Text style={styles.readingValue}>{mostrarLectura(lecturaAnteriorElec)}</Text>
+              </View>
+              <View style={styles.readingRow}>
+                <Text style={styles.readingLabel}>Consumo del Mes (kWh):</Text>
+                <Text style={styles.readingValue}>{mostrarLectura(consumoElec)}</Text>
+              </View>
+              <Text style={styles.observation}>Anomalías: {anomaliasElec}</Text>
+            </View>
+          </View>
+          {/* Separador visual */}
+          <Text style={styles.separator}>----------------------------------------------------</Text>
+          {/* Eficiencia */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>EFICIENCIA DETECTADA:</Text>
+            <View style={styles.readingRow}>
+              <Text style={styles.readingLabel}>Eficiencia Actual:</Text>
+              <Text style={styles.readingValue}>{mostrarLectura(eficienciaActual)} m³/kWh</Text>
+            </View>
+            <View style={styles.readingRow}>
+              <Text style={styles.readingLabel}>Eficiencia Promedio Histórica:</Text>
+              <Text style={styles.readingValue}>{mostrarLectura(eficienciaPromedioHistorica)} m³/kWh</Text>
+            </View>
+          </View>
+          {/* Separador visual */}
+          <Text style={styles.separator}>----------------------------------------------------</Text>
+          {/* Observaciones */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>OBSERVACIONES GENERALES:</Text>
+            <Text style={styles.observationText}>{observaciones}</Text>
+          </View>
+        </View>
+      </ScrollView>
+    );
+  }
+
+  // Renderizado condicional para mostrar la lectura recién creada si existe
+  if (lecturaActualDirecta) {
+    const lectura = lecturaActualDirecta;
+    const pozo = lectura.pozo;
+    const bateria = pozo?.bateria;
+    const numeroSerieVol = mostrarValor(lectura.numero_serie_volumetrico);
+    const numeroSerieElec = mostrarValor(lectura.numero_serie_electrico);
+    const lecturaActualVol = mostrarValor(lectura.volumen);
+    const lecturaAnteriorVol = mostrarValor(lecturaAnteriorDirecta?.volumen);
+    const consumoVol = lecturaAnteriorDirecta ? mostrarValor(lectura.volumen - lecturaAnteriorDirecta.volumen) : "N/A";
+    const lecturaActualElec = mostrarValor(lectura.lectura_electrica);
+    const lecturaAnteriorElec = mostrarValor(lecturaAnteriorDirecta?.lectura_electrica);
+    const consumoElec = lecturaAnteriorDirecta ? mostrarValor(lectura.lectura_electrica - lecturaAnteriorDirecta.lectura_electrica) : "N/A";
+    const eficienciaActual = mostrarValor(lectura.eficiencia, "N/A");
+    const eficienciaPromedioHistorica = mostrarValor(lectura.eficiencia_promedio_historica, "N/A");
+    const anomaliasVol = Array.isArray(lectura.anomalias_volumetrico) && lectura.anomalias_volumetrico.length > 0 ? lectura.anomalias_volumetrico.join(', ') : "Ninguna";
+    const anomaliasElec = Array.isArray(lectura.anomalias_electrico) && lectura.anomalias_electrico.length > 0 ? lectura.anomalias_electrico.join(', ') : "Ninguna";
+    const observaciones = mostrarValor(lectura.observaciones, "Sin observaciones");
+    const ubicacion = pozo?.latitud && pozo?.longitud ? `Lat ${pozo.latitud}, Long ${pozo.longitud}` : 'No disponible';
+    const fecha = lectura.fecha ? lectura.fecha.split('T')[0] : '';
+    const hora = lectura.fecha ? new Date(lectura.fecha).toTimeString().split(' ')[0] : '';
+
+    return (
+      <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+        <View style={styles.ticketContainer}>
+          {/* Encabezado */}
+          <View style={styles.ticketHeader}>
+            <Text style={styles.ticketNumber}>051</Text>
+            <Text style={styles.ticketTitle}>ASOCIACIÓN DE USUARIOS DEL DISTRITO DE RIEGO</Text>
+            <Text style={styles.ticketTitle}>NÚMERO 051 COSTA DE HERMOSILLO, A.C.</Text>
+          </View>
+          {/* Info principal */}
+          <View style={styles.infoRow}>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Batería:</Text>
+              <Text style={styles.infoValue}>{bateria?.nombrebateria ?? 'N/A'}</Text>
+            </View>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Pozo:</Text>
+              <Text style={styles.infoValue}>{pozo?.numeropozo ?? 'N/A'}</Text>
+            </View>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Predio:</Text>
+              <Text style={styles.infoValue}>{pozo?.predio ?? 'N/A'}</Text>
+            </View>
+          </View>
+          <View style={styles.infoRow}>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Fecha:</Text>
+              <Text style={styles.infoValue}>{fecha}</Text>
+            </View>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Hora:</Text>
+              <Text style={styles.infoValue}>{hora}</Text>
+            </View>
+          </View>
+          {/* Separador visual */}
+          <Text style={styles.separator}>----------------------------------------------------</Text>
+          {/* Ubicación */}
+          <View style={styles.locationRow}>
+            <Text style={styles.locationText}>Ubicación: {ubicacion}</Text>
+          </View>
+          {/* Separador visual */}
+          <Text style={styles.separator}>----------------------------------------------------</Text>
+          {/* Sección de lecturas */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>LECTURAS DEL MES:</Text>
+            {/* Medidor Volumétrico */}
+            <View style={styles.readingContainer}>
+              <Text style={styles.readingTitle}>- Medidor Volumétrico: {numeroSerieVol}</Text>
+              <View style={styles.readingRow}>
+                <Text style={styles.readingLabel}>Lectura Actual (m³):</Text>
+                <Text style={styles.readingValue}>{mostrarLectura(lecturaActualVol)}</Text>
+              </View>
+              <View style={styles.readingRow}>
+                <Text style={styles.readingLabel}>Lectura Anterior (m³):</Text>
+                <Text style={styles.readingValue}>{lecturaAnteriorDirecta ? mostrarLectura(lecturaAnteriorVol) : 'Primera lectura'}</Text>
+              </View>
+              <View style={styles.readingRow}>
+                <Text style={styles.readingLabel}>Consumo del Mes (m³):</Text>
+                <Text style={styles.readingValue}>{lecturaAnteriorDirecta ? mostrarLectura(consumoVol) : 'N/A'}</Text>
+              </View>
+              <Text style={styles.observation}>Anomalías: {anomaliasVol}</Text>
+            </View>
+            {/* Medidor Eléctrico */}
+            <View style={styles.readingContainer}>
+              <Text style={styles.readingTitle}>- Medidor Eléctrico: {numeroSerieElec}</Text>
+              <View style={styles.readingRow}>
+                <Text style={styles.readingLabel}>Lectura Actual (kWh):</Text>
+                <Text style={styles.readingValue}>{mostrarLectura(lecturaActualElec)}</Text>
+              </View>
+              <View style={styles.readingRow}>
+                <Text style={styles.readingLabel}>Lectura Anterior (kWh):</Text>
+                <Text style={styles.readingValue}>{lecturaAnteriorDirecta ? mostrarLectura(lecturaAnteriorElec) : 'Primera lectura'}</Text>
+              </View>
+              <View style={styles.readingRow}>
+                <Text style={styles.readingLabel}>Consumo del Mes (kWh):</Text>
+                <Text style={styles.readingValue}>{lecturaAnteriorDirecta ? mostrarLectura(consumoElec) : 'N/A'}</Text>
+              </View>
+              <Text style={styles.observation}>Anomalías: {anomaliasElec}</Text>
+            </View>
+          </View>
+          {/* Separador visual */}
+          <Text style={styles.separator}>----------------------------------------------------</Text>
+          {/* Sección de eficiencia */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>EFICIENCIA DETECTADA:</Text>
+            <View style={styles.readingRow}>
+              <Text style={styles.readingLabel}>Eficiencia Actual:</Text>
+              <Text style={styles.readingValue}>{mostrarLectura(eficienciaActual)} m³/kWh</Text>
+            </View>
+            <View style={styles.readingRow}>
+              <Text style={styles.readingLabel}>Eficiencia Promedio Histórica:</Text>
+              <Text style={styles.readingValue}>{mostrarLectura(eficienciaPromedioHistorica)} m³/kWh</Text>
+            </View>
+          </View>
+          {/* Separador visual */}
+          <Text style={styles.separator}>----------------------------------------------------</Text>
+          {/* Información adicional */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>INFORMACIÓN ADICIONAL:</Text>
+            <View style={styles.readingRow}>
+              <Text style={styles.readingLabel}>Carga del Motor:</Text>
+              <Text style={styles.readingValue}>{mostrarLectura(lectura.carga_motor, 'Sin registro')} A</Text>
+            </View>
+            <View style={styles.readingRow}>
+              <Text style={styles.readingLabel}>Gasto del Pozo:</Text>
+              <Text style={styles.readingValue}>{mostrarLectura(lectura.gasto_pozo, 'Sin registro')} L</Text>
+            </View>
+          </View>
+          {/* Separador visual */}
+          <Text style={styles.separator}>----------------------------------------------------</Text>
+          {/* Observaciones generales */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>OBSERVACIONES GENERALES:</Text>
+            <Text style={styles.observationText}>{observaciones}</Text>
+          </View>
+        </View>
+      </ScrollView>
+    );
+  }
+
+  // Si estamos en modo previsualización, usar los datos del pozo
+  const pozo = pozoData;
+  const bateria = pozo?.bateria;
+  // Usar lecturas (que es el alias de lectura_de_pozos en la respuesta del backend)
+  const lecturaActual = pozo?.lecturas?.[0];
+  const lecturaAnterior = pozo?.lecturas?.[1];
+
+  // Datos para mostrar en el ticket
+  const numeroSerieVol = mostrarValor(lecturaActual?.numero_serie_volumetrico);
+  const numeroSerieElec = mostrarValor(lecturaActual?.numero_serie_electrico);
+  const lecturaActualVol = mostrarValor(lecturaActual?.volumen);
+  const lecturaAnteriorVol = mostrarValor(lecturaAnterior?.volumen);
+  const consumoVol = lecturaAnterior ? mostrarValor(lecturaActual?.volumen - lecturaAnterior?.volumen) : "N/A";
+  const lecturaActualElec = mostrarValor(lecturaActual?.lectura_electrica);
+  const lecturaAnteriorElec = mostrarValor(lecturaAnterior?.lectura_electrica);
+  const consumoElec = lecturaAnterior ? mostrarValor(lecturaActual?.lectura_electrica - lecturaAnterior?.lectura_electrica) : "N/A";
+  const eficienciaActual = mostrarValor(lecturaActual?.eficiencia, "N/A");
+  const eficienciaPromedioHistorica = mostrarValor(lecturaActual?.eficiencia_promedio_historica, "N/A");
+  const anomaliasVol = Array.isArray(lecturaActual?.anomalias_volumetrico) && lecturaActual.anomalias_volumetrico.length > 0 ? lecturaActual.anomalias_volumetrico.join(', ') : "Ninguna";
+  const anomaliasElec = Array.isArray(lecturaActual?.anomalias_electrico) && lecturaActual.anomalias_electrico.length > 0 ? lecturaActual.anomalias_electrico.join(', ') : "Ninguna";
+  const observaciones = mostrarValor(lecturaActual?.observaciones, "Sin observaciones");
+  const ubicacion = pozo?.latitud && pozo?.longitud ? `Lat ${pozo.latitud}, Long ${pozo.longitud}` : 'No disponible';
+
   return (
     <View style={styles.container}>
       {/* Configuración del StatusBar */}
@@ -791,20 +1162,21 @@ export default function TicketScreen() {
             <Text style={styles.ticketTitle}>ASOCIACIÓN DE USUARIOS DEL DISTRITO DE RIEGO</Text>
             <Text style={styles.ticketTitle}>NÚMERO 051 COSTA DE HERMOSILLO, A.C.</Text>
           </View>
-
           {/* Información del pozo */}
           <View style={styles.infoRow}>
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Batería:</Text>
-              <Text style={styles.infoValue}>#3</Text>
+              <Text style={styles.infoValue}>{bateria?.nombrebateria ?? 'N/A'}</Text>
             </View>
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Pozo:</Text>
-              <Text style={styles.infoValue}>{pozoId}</Text>
+              <Text style={styles.infoValue}>{pozo?.numeropozo ?? 'N/A'}</Text>
             </View>
+          </View>
+          <View style={styles.infoRow}>
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Predio:</Text>
-              <Text style={styles.infoValue}>{pozoUbicacion}</Text>
+              <Text style={styles.infoValue}>{pozo?.predio ?? 'N/A'}</Text>
             </View>
           </View>
 
@@ -822,128 +1194,85 @@ export default function TicketScreen() {
 
           {/* Ubicación */}
           <View style={styles.locationRow}>
-            <Text style={styles.locationText}>Ubicación: Lat 28.930000, Long -111.570000</Text>
+            <Text style={styles.locationText}>Ubicación: {ubicacion}</Text>
           </View>
 
-          {/* Sección de lecturas */}
+          {/* Separador visual */}
+          <Text style={styles.separator}>----------------------------------------------------</Text>
+          {/* Lecturas del mes */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>LECTURAS DEL MES:</Text>
 
             {/* Medidor Volumétrico */}
             <View style={styles.readingContainer}>
-              <Text style={styles.readingTitle}>- Medidor Volumétrico: No.55555666</Text>
+              <Text style={styles.readingTitle}>- Medidor Volumétrico: {numeroSerieVol}</Text>
               <View style={styles.readingRow}>
                 <Text style={styles.readingLabel}>Lectura Actual (m³):</Text>
-                <Text style={styles.readingValue}>{Number.parseInt(lecturaVolumen).toLocaleString()}</Text>
+                <Text style={styles.readingValue}>{mostrarLectura(lecturaActualVol)}</Text>
               </View>
               <View style={styles.readingRow}>
                 <Text style={styles.readingLabel}>Lectura Anterior (m³):</Text>
-                <Text style={styles.readingValue}>{Number.parseInt(lecturaVolumenAnterior).toLocaleString()}</Text>
+                <Text style={styles.readingValue}>{lecturaAnteriorDirecta ? mostrarLectura(lecturaAnteriorVol) : 'Primera lectura'}</Text>
               </View>
               <View style={styles.readingRow}>
                 <Text style={styles.readingLabel}>Consumo del Mes (m³):</Text>
-                <Text style={styles.readingValue}>{consumoVolumen.toLocaleString()} (0.0 M/h)</Text>
+                <Text style={styles.readingValue}>{lecturaAnteriorDirecta ? mostrarLectura(consumoVol) : 'N/A'}</Text>
               </View>
+              <Text style={styles.observation}>Anomalías: {anomaliasVol}</Text>
             </View>
 
             {/* Medidor Eléctrico */}
             <View style={styles.readingContainer}>
-              <Text style={styles.readingTitle}>- Medidor Eléctrico: No.66655555</Text>
+              <Text style={styles.readingTitle}>- Medidor Eléctrico: {numeroSerieElec}</Text>
               <View style={styles.readingRow}>
                 <Text style={styles.readingLabel}>Lectura Actual (kWh):</Text>
-                <Text style={styles.readingValue}>{lecturaElectrica}</Text>
+                <Text style={styles.readingValue}>{mostrarLectura(lecturaActualElec)}</Text>
               </View>
               <View style={styles.readingRow}>
                 <Text style={styles.readingLabel}>Lectura Anterior (kWh):</Text>
-                <Text style={styles.readingValue}>{lecturaElectricaAnterior}</Text>
+                <Text style={styles.readingValue}>{lecturaAnteriorDirecta ? mostrarLectura(lecturaAnteriorElec) : 'Primera lectura'}</Text>
               </View>
               <View style={styles.readingRow}>
                 <Text style={styles.readingLabel}>Consumo del Mes (kWh):</Text>
-                <Text style={styles.readingValue}>{consumoElectrico}</Text>
+                <Text style={styles.readingValue}>{lecturaAnteriorDirecta ? mostrarLectura(consumoElec) : 'N/A'}</Text>
               </View>
-              <Text style={styles.observation}>Observaciones: {observaciones}</Text>
+              <Text style={styles.observation}>Anomalías: {anomaliasElec}</Text>
             </View>
           </View>
-
+          {/* Separador visual */}
+          <Text style={styles.separator}>----------------------------------------------------</Text>
           {/* Sección de eficiencia */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>EFICIENCIA DETECTADA:</Text>
             <View style={styles.readingRow}>
               <Text style={styles.readingLabel}>Eficiencia Actual:</Text>
-              <Text style={styles.readingValue}>{eficienciaActual} m³/kWh</Text>
+              <Text style={styles.readingValue}>{mostrarLectura(eficienciaActual)} m³/kWh</Text>
             </View>
             <View style={styles.readingRow}>
               <Text style={styles.readingLabel}>Eficiencia Promedio Histórica:</Text>
-              <Text style={styles.readingValue}>383.57 m³/kWh</Text>
+              <Text style={styles.readingValue}>{mostrarLectura(eficienciaPromedioHistorica)} m³/kWh</Text>
             </View>
           </View>
-
+          {/* Separador visual */}
+          <Text style={styles.separator}>----------------------------------------------------</Text>
           {/* Información adicional */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>INFORMACIÓN ADICIONAL:</Text>
             <View style={styles.readingRow}>
               <Text style={styles.readingLabel}>Carga del Motor:</Text>
-              <Text style={styles.readingValue}>{cargaMotor} A</Text>
+              <Text style={styles.readingValue}>{mostrarLectura(lecturaActual?.carga_motor, 'Sin registro')} A</Text>
             </View>
             <View style={styles.readingRow}>
               <Text style={styles.readingLabel}>Gasto del Pozo:</Text>
-              <Text style={styles.readingValue}>{gastoPozo || "N/A"} L</Text>
+              <Text style={styles.readingValue}>{mostrarLectura(lecturaActual?.gasto_pozo, 'Sin registro')} L</Text>
             </View>
           </View>
-
-          {/* Gráficos */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>HISTORIAL DE CONSUMO (12 MESES + ACTUAL):</Text>
-
-            {/* Gráfico de consumo volumétrico */}
-            <Text style={styles.chartTitle}>Consumo Volumétrico (m³):</Text>
-            <View style={styles.chartPlaceholder}>
-              <Text style={styles.chartPlaceholderText}>Datos de consumo volumétrico</Text>
-              <View style={styles.barChartContainer}>
-                {consumoVolData.datasets[0].data.map((value, index) => (
-                  <View key={index} style={styles.barChartColumn}>
-                    <View style={[styles.barChartBar, { height: value / 10 }]} />
-                    <Text style={styles.barChartLabel}>{consumoVolData.labels[index]}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-
-            {/* Gráfico de consumo eléctrico */}
-            <Text style={styles.chartTitle}>Consumo Eléctrico (kWh):</Text>
-            <View style={styles.chartPlaceholder}>
-              <Text style={styles.chartPlaceholderText}>Datos de consumo eléctrico</Text>
-              <View style={styles.barChartContainer}>
-                {consumoElecData.datasets[0].data.map((value, index) => (
-                  <View key={index} style={styles.barChartColumn}>
-                    <View style={[styles.barChartBar, { height: value * 5, backgroundColor: "#4169E1" }]} />
-                    <Text style={styles.barChartLabel}>{consumoElecData.labels[index]}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          </View>
-
-          {/* Gráfico de eficiencia */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>HISTORIAL DE EFICIENCIA (12 MESES + ACTUAL):</Text>
-            <View style={styles.chartPlaceholder}>
-              <Text style={styles.chartPlaceholderText}>Datos de eficiencia</Text>
-              <View style={styles.barChartContainer}>
-                {eficienciaData.datasets[0].data.map((value, index) => (
-                  <View key={index} style={styles.barChartColumn}>
-                    <View style={[styles.barChartBar, { height: value / 10, backgroundColor: "#FFA500" }]} />
-                    <Text style={styles.barChartLabel}>{eficienciaData.labels[index]}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          </View>
-
+          {/* Separador visual */}
+          <Text style={styles.separator}>----------------------------------------------------</Text>
           {/* Observaciones generales */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>OBSERVACIONES GENERALES:</Text>
-            <Text style={styles.observationText}>{observaciones || "Sin observaciones adicionales."}</Text>
+            <Text style={styles.observationText}>{observaciones}</Text>
           </View>
         </ViewShot>
       </ScrollView>
@@ -1176,6 +1505,22 @@ const styles = StyleSheet.create({
     color: "white",
     marginTop: 12,
     fontSize: 16,
+  },
+  content: {
+    flex: 1,
+  },
+  contentContainer: {
+    padding: 16,
+  },
+  sectionText: {
+    color: "#333",
+    marginBottom: 8,
+  },
+  separator: {
+    textAlign: 'center',
+    color: '#bbb',
+    marginVertical: 8,
+    fontWeight: 'bold',
   },
 })
 

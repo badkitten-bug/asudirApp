@@ -1,4 +1,5 @@
 import { createSlice, type PayloadAction, createAsyncThunk } from "@reduxjs/toolkit"
+import { createSelector } from "@reduxjs/toolkit"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 
 // Definir la estructura de un ticket
@@ -164,14 +165,33 @@ const ticketsSlice = createSlice({
 export const { setTickets, clearTickets } = ticketsSlice.actions
 export default ticketsSlice.reducer
 
-// Selectores para obtener datos específicos
-export const selectAllTickets = (state: { tickets: TicketsState }) => state.tickets.tickets
-export const selectPendingTickets = (state: { tickets: TicketsState }) =>
-  state.tickets.tickets.filter((ticket) => ticket.estado === "pendiente")
-export const selectSyncedTickets = (state: { tickets: TicketsState }) =>
-  state.tickets.tickets.filter((ticket) => ticket.estado === "sincronizado")
-export const selectTodayTickets = (state: { tickets: TicketsState }) => {
-  const today = new Date().toISOString().split("T")[0]
-  return state.tickets.tickets.filter((ticket) => ticket.fecha === today)
-}
+// Selectores base
+const selectTicketsState = (state: { tickets: TicketsState }) => state.tickets
+
+// Selector memoizado para todos los tickets
+export const selectAllTickets = createSelector(
+  selectTicketsState,
+  (ticketsState) => ticketsState.tickets
+)
+
+// Selector memoizado para tickets pendientes
+export const selectPendingTickets = createSelector(
+  selectAllTickets,
+  (tickets) => tickets.filter((ticket) => ticket.estado === "pendiente")
+)
+
+// Selector memoizado para tickets sincronizados
+export const selectSyncedTickets = createSelector(
+  selectAllTickets,
+  (tickets) => tickets.filter((ticket) => ticket.estado === "sincronizado")
+)
+
+// Selector memoizado para tickets de hoy
+export const selectTodayTickets = createSelector(
+  selectAllTickets,
+  (tickets) => {
+    const today = new Date().toISOString().split("T")[0]
+    return tickets.filter((ticket) => ticket.fecha === today)
+  }
+)
 

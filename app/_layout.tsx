@@ -1,13 +1,13 @@
 "use client"
 
+import React from "react"
 import { useEffect } from "react"
 import { Stack } from "expo-router"
 import { Provider } from "react-redux"
-import { store } from "../store"
 import Snackbar from "../components/Snackbar"
 import { loadUser } from "../store/authSlice"
 import { View, ActivityIndicator, Text } from "react-native"
-import { useDispatch, useSelector } from "../store"
+import { useDispatch, useSelector,store } from "../store"
 // Agregar la importación de loadTickets, loadSignedTickets y loadPozos
 import { loadTickets } from "../store/ticketsSlice"
 import { loadSignedTickets } from "../store/signedTicketsSlice"

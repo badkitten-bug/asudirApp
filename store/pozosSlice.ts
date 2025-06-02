@@ -4,6 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage"
 // Definir la estructura de un pozo
 export interface Pozo {
   id: string
+  documentId: string
   nombre: string
   bateria: string
   predio: string
@@ -22,13 +23,7 @@ interface PozosState {
 }
 
 // Datos iniciales para tener algo que mostrar la primera vez
-const POZOS_INICIALES: Pozo[] = [
-  { id: "1001", nombre: "Pozo 1001", bateria: "Batería#1", predio: "La Esperanza" },
-  { id: "1002", nombre: "Pozo 1002", bateria: "Batería#1", predio: "La Esperanza" },
-  { id: "1003", nombre: "Pozo 1003", bateria: "Batería#1", predio: "La Esperanza" },
-  { id: "2001", nombre: "Pozo 2001", bateria: "Batería#2", predio: "El Mirador" },
-  { id: "3001", nombre: "Pozo 3001", bateria: "Batería#3", predio: "Las Cumbres" },
-]
+// const POZOS_INICIALES: Pozo[] = [ ... ] // ELIMINADO
 
 const initialState: PozosState = {
   pozos: [],
@@ -46,20 +41,16 @@ export const loadPozos = createAsyncThunk("pozos/loadPozos", async () => {
   try {
     const pozosJson = await AsyncStorage.getItem(POZOS_STORAGE_KEY)
     const lastSyncDate = await AsyncStorage.getItem(POZOS_SYNC_DATE_KEY)
-    
     if (pozosJson) {
       const pozos = JSON.parse(pozosJson)
       console.log("Pozos cargados desde AsyncStorage:", pozos.length)
       return { pozos, lastSyncDate }
     }
-    
-    console.log("No se encontraron pozos en AsyncStorage, usando datos iniciales")
-    // Si no hay datos en AsyncStorage, usar los datos iniciales
-    await AsyncStorage.setItem(POZOS_STORAGE_KEY, JSON.stringify(POZOS_INICIALES))
-    return { pozos: POZOS_INICIALES, lastSyncDate: null }
+    // Si no hay datos en AsyncStorage, dejar el array vacío
+    return { pozos: [], lastSyncDate: null }
   } catch (error) {
     console.error("Error loading pozos from storage:", error)
-    return { pozos: POZOS_INICIALES, lastSyncDate: null }
+    return { pozos: [], lastSyncDate: null }
   }
 })
 
@@ -75,44 +66,50 @@ export const savePozos = createAsyncThunk("pozos/savePozos", async (pozos: Pozo[
   }
 })
 
-// Thunk para sincronizar pozos con el servidor (simulado)
+// Thunk para sincronizar pozos con el servidor real
 export const syncPozos = createAsyncThunk("pozos/syncPozos", async (_, { getState }) => {
   try {
-    // Aquí iría la lógica para sincronizar con el servidor
-    // Por ahora, simulamos una sincronización exitosa
-    
-    // Simulamos una demora de red
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    
-    // Obtenemos los pozos actuales
-    const state = getState() as { pozos: PozosState }
-    const currentPozos = state.pozos.pozos
-    
-    // Simulamos que el servidor nos devuelve los mismos pozos más algunos nuevos
-    const newPozos: Pozo[] = [
-      ...currentPozos,
-      // Estos solo se añadirán si no existen ya (ver la lógica en el reducer)
-      { id: "4001", nombre: "Pozo 4001", bateria: "Batería#4", predio: "Valle Verde" },
-      { id: "4002", nombre: "Pozo 4002", bateria: "Batería#4", predio: "Valle Verde" },
-      { id: "5001", nombre: "Pozo 5001", bateria: "Batería#5", predio: "Los Altos" },
-    ]
-    
-    // Eliminamos duplicados basados en el ID
-    const uniquePozos = Array.from(new Map(newPozos.map(pozo => [pozo.id, pozo])).values())
-    
-    // Guardamos la fecha de sincronización
-    const syncDate = new Date().toISOString()
-    await AsyncStorage.setItem(POZOS_SYNC_DATE_KEY, syncDate)
-    
-    // Guardamos los pozos actualizados
-    await AsyncStorage.setItem(POZOS_STORAGE_KEY, JSON.stringify(uniquePozos))
-    
-    return { pozos: uniquePozos, syncDate }
+    // Obtener userId y token del estado de autenticación
+    const state = getState() as any;
+    const userId = state.auth.user?.id;
+    const token = state.auth.user?.token;
+
+    if (!userId || !token) {
+      throw new Error("Usuario no autenticado");
+    }
+
+    // Usar la variable de entorno para la URL del backend
+    const API_URL = process.env.EXPO_PUBLIC_API_URL;
+
+    const response = await fetch(`${API_URL}/api/pozos-capturador/${userId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    if (!response.ok) throw new Error('Error al obtener pozos');
+    const data = await response.json();
+
+    // Mapea los pozos al formato que espera tu UI
+    const pozos = data.pozos.map((pozo: any) => ({
+      id: pozo.id.toString(),
+      documentId: pozo.documentId,
+      nombre: pozo.numeropozo,
+      bateria: pozo.bateria,
+      predio: pozo.predio,
+    }));
+
+    // Guardar en AsyncStorage
+    await AsyncStorage.setItem(POZOS_STORAGE_KEY, JSON.stringify(pozos));
+    const syncDate = new Date().toISOString();
+    await AsyncStorage.setItem(POZOS_SYNC_DATE_KEY, syncDate);
+
+    return { pozos, syncDate };
   } catch (error) {
-    console.error("Error syncing pozos with server:", error)
-    throw error
+    console.error("Error syncing pozos with server:", error);
+    throw error;
   }
-})
+});
 
 // Thunk para agregar un nuevo pozo
 export const addPozo = createAsyncThunk("pozos/addPozo", async (pozo: Pozo, { getState, dispatch }) => {

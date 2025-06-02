@@ -81,7 +81,7 @@ export default function CameraScreen({
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 300,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web', // Solo usar native driver en móvil
       }).start();
 
       // Configurar temporizador para ocultarlos
@@ -89,7 +89,7 @@ export default function CameraScreen({
         Animated.timing(fadeAnim, {
           toValue: 0,
           duration: 300,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web', // Solo usar native driver en móvil
         }).start(() => setShowControls(false));
       }, 4000);
     }
@@ -268,9 +268,11 @@ export default function CameraScreen({
             ref={cameraRef}
           >
             {/* Header */}
-            <Animated.View
-              style={[styles.header, { opacity: fadeAnim }]}
-              pointerEvents={showControls ? "auto" : "none"}
+            <View 
+              style={[
+                styles.header,
+                { pointerEvents: showControls ? "auto" : "none" }
+              ]}
             >
               <TouchableOpacity style={styles.closeButton} onPress={onClose}>
                 <Ionicons name="close" size={28} color="white" />
@@ -294,12 +296,14 @@ export default function CameraScreen({
                   color="white"
                 />
               </TouchableOpacity>
-            </Animated.View>
+            </View>
 
             {/* Controles laterales */}
-            <Animated.View
-              style={[styles.sideControls, { opacity: fadeAnim }]}
-              pointerEvents={showControls ? "auto" : "none"}
+            <View 
+              style={[
+                styles.sideControls,
+                { pointerEvents: showControls ? "auto" : "none" }
+              ]}
             >
               <TouchableOpacity
                 style={styles.sideButton}
@@ -315,7 +319,7 @@ export default function CameraScreen({
               <TouchableOpacity style={styles.sideButton}>
                 <Ionicons name="timer-outline" size={24} color="white" />
               </TouchableOpacity>
-            </Animated.View>
+            </View>
 
             {/* Botón de captura */}
             <View style={styles.captureContainer}>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   View,
   Text,
@@ -17,13 +17,16 @@ import {
 import { StatusBar } from "expo-status-bar"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter, useLocalSearchParams } from "expo-router"
-import { useDispatch } from "../../store"
+import { useDispatch, useSelector } from "../../store"
 import { showSnackbar } from "../../store/snackbarSlice"
 import Constants from "expo-constants"
 import CameraScreen from "../../components/CameraScreen"
+import Checkbox from '../../components/Checkbox'
+import { selectUser } from '../../store/authSlice'
 
 // Importar el componente SelectDropdown
 import SelectDropdown from "../../components/SelectDropdown"
+import TicketPreviewModal from '../../components/TicketPreviewModal'
 
 const STATUSBAR_HEIGHT = Constants.statusBarHeight || 0
 
@@ -57,27 +60,63 @@ const DISTANCIA_OPTIONS = [
   { label: "Más de 50m", value: "mas_50m" },
 ]
 
+const ANOMALIAS_VOLUMETRICO = [
+  'Medidor Apagado',
+  'Sin medidor',
+  'Pozo encendido, medidor no marca gasto',
+  'Sin Acceso',
+  'Lectura ilegible',
+  'Cambio de Medidor',
+  'Otro',
+];
+const ANOMALIAS_ELECTRICO = [
+  'Medidor Apagado',
+  'Sin medidor',
+  'Sin Acceso',
+  'Lectura ilegible',
+  'Cambio de Medidor',
+  'Otro',
+];
+
 export default function NuevaCapturaScreen() {
   const router = useRouter()
   const dispatch = useDispatch()
   const params = useLocalSearchParams()
+  const user = useSelector(selectUser)
 
   // Estados para los campos del formulario
-  const [lecturaVolumen, setLecturaVolumen] = useState("255000")
-  const [cargaMotor, setCargaMotor] = useState("15.5")
+  const [lecturaVolumen, setLecturaVolumen] = useState("0")
   const [photoUri, setPhotoUri] = useState<string | null>(null)
   const [showCamera, setShowCamera] = useState(false)
-
-  // Agregar estados para los selects después de los estados existentes
-  const [estadoMedidorVolumetrico, setEstadoMedidorVolumetrico] = useState("funcionando")
-  const [extraccionManual, setExtraccionManual] = useState("normal")
-  const [tipoDescarga, setTipoDescarga] = useState("libre")
-  const [distancia, setDistancia] = useState("35m")
+  const [gasto, setGasto] = useState('0')
+  // Mostrar/ocultar anomalías
+  const [mostrarAnomaliasVol, setMostrarAnomaliasVol] = useState(false)
+  const [mostrarAnomaliasElec, setMostrarAnomaliasElec] = useState(false)
 
   // Datos del pozo seleccionado
-  const pozoId = (params.pozoId as string) || "1003"
-  const pozoNombre = (params.pozoNombre as string) || "Pozo 1003"
-  const pozoUbicacion = (params.pozoUbicacion as string) || "Las Cumbres"
+  const pozoId = (params.pozoId as string) || ""
+  const pozoNombre = (params.pozoNombre as string) || "N/A"
+  const pozoUbicacion = (params.pozoUbicacion as string) || "N/A"
+
+  // Agregar nuevos estados
+  const [anomaliasVol, setAnomaliasVol] = useState<string[]>([])
+  const [anomaliasElec, setAnomaliasElec] = useState<string[]>([])
+  const [cambioSerieVol, setCambioSerieVol] = useState('')
+  const [cambioSerieElec, setCambioSerieElec] = useState('')
+  const [otroVol, setOtroVol] = useState('')
+  const [otroElec, setOtroElec] = useState('')
+  const [lecturaElectrica, setLecturaElectrica] = useState('')
+  const [photoUriElec, setPhotoUriElec] = useState<string | null>(null)
+  const [observaciones, setObservaciones] = useState('')
+
+  // Nuevo estado para la información del pozo
+  const [pozoInfo, setPozoInfo] = useState<any>(null)
+  const [loadingPozo, setLoadingPozo] = useState(true)
+  const [usuarioPozoId, setUsuarioPozoId] = useState<number | null>(null)
+  const [cicloId, setCicloId] = useState<number | null>(null)
+
+  // Estado para mostrar el modal de previsualización
+  const [showPreview, setShowPreview] = useState(false)
 
   // Función para volver al Panel de Control
   const handleBack = () => {
@@ -103,9 +142,7 @@ export default function NuevaCapturaScreen() {
       pathname: "/(tabs)/medidor-electrico",
       params: {
         lecturaVolumen,
-        cargaMotor,
-        photoUri,
-        pozoId,
+        pozoId: pozoId,
         pozoNombre,
         pozoUbicacion,
       },
@@ -134,6 +171,174 @@ export default function NuevaCapturaScreen() {
   const handleCloseCamera = () => {
     setShowCamera(false)
   }
+
+  // Checkbox handler
+  const handleCheck = (arr: string[], setArr: (v: string[]) => void, value: string) => {
+    if (arr.includes(value)) {
+      setArr(arr.filter(a => a !== value))
+    } else {
+      setArr([...arr, value])
+    }
+  }
+
+  const handleGenerateTicket = () => {
+    setShowPreview(true)
+  }
+
+  const handleConfirmar = async () => {
+    try {
+      if (!user || !user.token) {
+        dispatch(showSnackbar({ message: 'No autenticado', type: 'error', duration: 3000 }))
+        return
+      }
+      if (!pozoInfo || !pozoInfo.id || !pozoInfo.usuario_pozo?.id || !pozoInfo.ciclo_agricola?.id) {
+        dispatch(showSnackbar({ message: 'No se pudo obtener pozo, usuario_pozo o ciclo', type: 'error', duration: 3000 }))
+        return
+      }
+      // Subir foto volumétrica si existe
+      let idFotoVol = null
+      if (photoUri) {
+        const formData: any = new FormData()
+        formData.append('files', {
+          uri: photoUri,
+          name: 'foto_volumetrico.jpg',
+          type: 'image/jpeg',
+        } as any)
+        const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/upload`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${user.token}` },
+          body: formData
+        })
+        const data = await res.json()
+        idFotoVol = data[0]?.id
+      }
+      // Subir foto eléctrica si existe
+      let idFotoElec = null
+      if (photoUriElec) {
+        const formData: any = new FormData()
+        formData.append('files', {
+          uri: photoUriElec,
+          name: 'foto_electrico.jpg',
+          type: 'image/jpeg',
+        } as any)
+        const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/upload`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${user.token}` },
+          body: formData
+        })
+        const data = await res.json()
+        idFotoElec = data[0]?.id
+      }
+      // Armar el payload usando los IDs numéricos
+      const payload: any = {
+        data: {
+          fecha: new Date().toISOString(),
+          volumen: Number(lecturaVolumen),
+          gasto: Number(gasto),
+          lectura_electrica: Number(lecturaElectrica),
+          observaciones,
+          pozo: pozoInfo.id,
+          usuario_pozo: pozoInfo.usuario_pozo.id,
+          ciclo: pozoInfo.ciclo_agricola.id,
+          estado: "pendiente",
+        }
+      }
+      // Solo agregar anomalías si hay alguna seleccionada
+      if (mostrarAnomaliasVol && anomaliasVol.length > 0) {
+        // Validar que todas las anomalías sean válidas
+        const anomaliasVolValidas = anomaliasVol.filter(anomalia => 
+          ["Medidor Apagado", "Sin medidor", "Pozo encendido, medidor no marca gasto", 
+           "Sin Acceso", "Lectura ilegible", "Cambio de Medidor", "Otro"].includes(anomalia)
+        )
+        if (anomaliasVolValidas.length > 0) {
+          payload.data.anomalias_volumetrico = anomaliasVolValidas // Enviar como array
+          if (otroVol) payload.data.detalle_otro_volumetrico = otroVol
+          if (cambioSerieVol) payload.data.detalle_cambio_medidor_volumetrico = cambioSerieVol
+        }
+      }
+      if (mostrarAnomaliasElec && anomaliasElec.length > 0) {
+        // Validar que todas las anomalías sean válidas
+        const anomaliasElecValidas = anomaliasElec.filter(anomalia => 
+          ["Medidor Apagado", "Sin medidor", "Sin Acceso", 
+           "Lectura ilegible", "Cambio de Medidor", "Otro"].includes(anomalia)
+        )
+        if (anomaliasElecValidas.length > 0) {
+          payload.data.anomalias_electrico = anomaliasElecValidas // Enviar como array
+          if (otroElec) payload.data.detalle_otro_electrico = otroElec
+          if (cambioSerieElec) payload.data.detalle_cambio_medidor_electrico = cambioSerieElec
+        }
+      }
+      if (idFotoVol) (payload.data as any)["foto_volumetrico"] = idFotoVol
+      if (idFotoElec) (payload.data as any)["foto_electrico"] = idFotoElec
+      // POST a lectura-pozos
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/lectura-pozos`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user.token}`
+        },
+        body: JSON.stringify(payload)
+      })
+      if (!response.ok) {
+        throw new Error('Error al guardar la lectura')
+      }
+      const result = await response.json()
+      dispatch(showSnackbar({ message: 'Lectura guardada correctamente', type: 'success', duration: 2000 }))
+      // Redirigir al ticket generado pasando el id de la lectura
+      router.push({ pathname: '/(tabs)/ticket', params: { lecturaId: result.id, pozoId: pozoInfo.id, pozoNombre, pozoUbicacion, lecturaVolumen, lecturaElectrica, gasto, observaciones } })
+    } catch (error: any) {
+      dispatch(showSnackbar({ message: error?.message || 'Error inesperado', type: 'error', duration: 3000 }))
+    }
+  }
+
+  useEffect(() => {
+    const fetchPozo = async () => {
+      setLoadingPozo(true)
+      try {
+        // Usar id numérico en el endpoint y enviar el token en el header
+        const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/pozos/${pozoId}?populate[usuario_pozo]=true&populate[ciclo_agricola]=true`, {
+          headers: {
+            'Authorization': `Bearer ${user?.token}`,
+            'Content-Type': 'application/json',
+          }
+        })
+        const data = await res.json()
+        setPozoInfo(data.data)
+        setUsuarioPozoId(data.data?.usuario_pozo?.id ?? null)
+        setCicloId(data.data?.ciclo_agricola?.id ?? null)
+      } catch (e) {
+        setPozoInfo(null)
+        setUsuarioPozoId(null)
+        setCicloId(null)
+      } finally {
+        setLoadingPozo(false)
+      }
+    }
+    if (pozoId) fetchPozo()
+  }, [pozoId])
+
+  useEffect(() => {
+    // Limpiar todos los campos del formulario al cambiar de pozo
+    setLecturaVolumen("0");
+    setPhotoUri(null);
+    setShowCamera(false);
+    setGasto('0');
+    setMostrarAnomaliasVol(false);
+    setMostrarAnomaliasElec(false);
+    setAnomaliasVol([]);
+    setAnomaliasElec([]);
+    setCambioSerieVol('');
+    setCambioSerieElec('');
+    setOtroVol('');
+    setOtroElec('');
+    setLecturaElectrica('');
+    setPhotoUriElec(null);
+    setObservaciones('');
+    setPozoInfo(null);
+    setLoadingPozo(true);
+    setUsuarioPozoId(null);
+    setCicloId(null);
+  }, [pozoId]);
 
   return (
     <View style={styles.container}>
@@ -173,26 +378,40 @@ export default function NuevaCapturaScreen() {
             {/* Información del pozo */}
             <View style={styles.sectionContainer}>
               <Text style={styles.sectionTitle}>Información del Pozo</Text>
-              <Text style={styles.sectionText}>ID: {pozoId}</Text>
-              <Text style={styles.sectionText}>Ubicación: 28.123456, -78.654321</Text>
+              <Text style={styles.sectionText}>ID: {pozoInfo?.id ?? 'No disponible'}</Text>
+              <Text style={styles.sectionText}>Nombre: {pozoInfo?.numeropozo ?? 'No disponible'}</Text>
+              <Text style={styles.sectionText}>Ubicación: {pozoInfo?.predio ?? 'No disponible'}</Text>
+              {pozoInfo?.localizacion && (
+                <Text style={styles.sectionText}>Localización: {pozoInfo.localizacion}</Text>
+              )}
+              {pozoInfo?.profundidad && (
+                <Text style={styles.sectionText}>Profundidad: {pozoInfo.profundidad} m</Text>
+              )}
             </View>
 
             {/* Lecturas anteriores */}
             <View style={styles.sectionContainer}>
               <Text style={styles.sectionTitle}>Lecturas Anteriores</Text>
-              <Text style={styles.sectionText}>Última lectura: 12/03/2023 - 15:00:00</Text>
-              <Text style={styles.sectionText}>Lectura volumétrica: 50 m³/min</Text>
+              <Text style={styles.sectionText}>No hay lecturas anteriores registradas.</Text>
             </View>
 
             {/* Medidor Volumétrico */}
             <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Medidor Volumétrico</Text>
-              <Text style={styles.inputLabel}>Lectura Actual (m³)</Text>
+              <Text style={[styles.sectionTitle, { color: '#00A86B' }]}>Medidor Volumétrico</Text>
+              <Text style={styles.inputLabel}>Lectura Volumétrica (m³)</Text>
               <TextInput
                 style={styles.input}
                 placeholder="Ingrese lectura volumétrica"
                 value={lecturaVolumen}
                 onChangeText={setLecturaVolumen}
+                keyboardType="numeric"
+              />
+              <Text style={styles.inputLabel}>Gasto (l/s)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Ingrese gasto volumétrico"
+                value={gasto}
+                onChangeText={setGasto}
                 keyboardType="numeric"
               />
 
@@ -210,62 +429,106 @@ export default function NuevaCapturaScreen() {
                   <Text style={styles.photoButtonText}>Tomar Foto</Text>
                 </TouchableOpacity>
               )}
-            </View>
 
-            {/* Reemplazar los dropdowns existentes */}
-            <SelectDropdown
-              title="Estado del Medidor Volumétrico"
-              options={MEDIDOR_VOLUMETRICO_OPTIONS}
-              selectedValue={estadoMedidorVolumetrico}
-              onSelect={setEstadoMedidorVolumetrico}
-              placeholder="Seleccionar el estado del medidor"
-              darkMode={true}
-            />
-
-            <SelectDropdown
-              title="Extracción Manual"
-              options={EXTRACCION_MANUAL_OPTIONS}
-              selectedValue={extraccionManual}
-              onSelect={setExtraccionManual}
-              placeholder="Seleccionar tipo de extracción manual"
-              darkMode={true}
-            />
-
-            <SelectDropdown
-              title="Tipo de Descarga"
-              options={TIPO_DESCARGA_OPTIONS}
-              selectedValue={tipoDescarga}
-              onSelect={setTipoDescarga}
-              placeholder="Seleccionar"
-              darkMode={true}
-            />
-
-            <SelectDropdown
-              title="Distancia"
-              options={DISTANCIA_OPTIONS}
-              selectedValue={distancia}
-              onSelect={setDistancia}
-              placeholder="Seleccionar"
-              darkMode={true}
-            />
-
-            {/* Carga del motor */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Carga del motor</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Ingrese la carga del motor"
-                value={cargaMotor}
-                onChangeText={setCargaMotor}
-                keyboardType="numeric"
-              />
+              {/* Anomalías volumétrico */}
+              <View style={{ marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                  <Checkbox checked={mostrarAnomaliasVol} onPress={() => setMostrarAnomaliasVol(!mostrarAnomaliasVol)} />
+                  <Text style={{ marginLeft: 8 }}>¿Hay anomalías en el medidor volumétrico?</Text>
+                </View>
+                {mostrarAnomaliasVol && (
+                  <View style={{ backgroundColor: '#fafafa', borderRadius: 8, padding: 8 }}>
+                    {ANOMALIAS_VOLUMETRICO.map((anomalia) => (
+                      <View key={anomalia} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                        <Checkbox checked={anomaliasVol.includes(anomalia)} onPress={() => handleCheck(anomaliasVol, setAnomaliasVol, anomalia)} />
+                        <Text style={{ marginLeft: 8 }}>{anomalia}</Text>
+                        {anomalia === 'Cambio de Medidor' && anomaliasVol.includes('Cambio de Medidor') && (
+                          <TextInput style={[styles.input, { marginLeft: 8, flex: 1 }]} placeholder="Ingresar número de serie del nuevo medidor" value={cambioSerieVol} onChangeText={setCambioSerieVol} />
+                        )}
+                        {anomalia === 'Otro' && anomaliasVol.includes('Otro') && (
+                          <TextInput style={[styles.input, { marginLeft: 8, flex: 1 }]} placeholder="Describa la anomalía" value={otroVol} onChangeText={setOtroVol} />
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
             </View>
           </View>
 
+          {/* --- Sección Medidor Eléctrico --- */}
+          <View style={styles.card}>
+            <Text style={[styles.sectionTitle, { color: '#00A86B' }]}>Medidor Eléctrico</Text>
+            <Text style={styles.inputLabel}>Lectura Eléctrica (kWh)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Ingrese la lectura eléctrica"
+              value={lecturaElectrica}
+              onChangeText={setLecturaElectrica}
+              keyboardType="numeric"
+            />
+
+            {photoUriElec ? (
+              <View style={styles.photoPreviewContainer}>
+                <Image source={{ uri: photoUriElec }} style={styles.photoPreview} />
+                <TouchableOpacity style={styles.retakeButton} onPress={() => setShowCamera(true)}>
+                  <Ionicons name="camera" size={20} color="white" />
+                  <Text style={styles.photoButtonText}>Volver a tomar</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity style={styles.photoButton} onPress={() => setShowCamera(true)}>
+                <Ionicons name="camera-outline" size={20} color="white" />
+                <Text style={styles.photoButtonText}>Tomar Foto</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Anomalías eléctrico */}
+            <View style={{ marginBottom: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                <Checkbox checked={mostrarAnomaliasElec} onPress={() => setMostrarAnomaliasElec(!mostrarAnomaliasElec)} />
+                <Text style={{ marginLeft: 8 }}>¿Hay anomalías en el medidor eléctrico?</Text>
+              </View>
+              {mostrarAnomaliasElec && (
+                <View style={{ backgroundColor: '#fafafa', borderRadius: 8, padding: 8 }}>
+                  {ANOMALIAS_ELECTRICO.map((anomalia) => (
+                    <View key={anomalia} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                      <Checkbox checked={anomaliasElec.includes(anomalia)} onPress={() => handleCheck(anomaliasElec, setAnomaliasElec, anomalia)} />
+                      <Text style={{ marginLeft: 8 }}>{anomalia}</Text>
+                      {anomalia === 'Cambio de Medidor' && anomaliasElec.includes('Cambio de Medidor') && (
+                        <TextInput style={[styles.input, { marginLeft: 8, flex: 1 }]} placeholder="Ingresar número de serie del nuevo medidor" value={cambioSerieElec} onChangeText={setCambioSerieElec} />
+                      )}
+                      {anomalia === 'Otro' && anomaliasElec.includes('Otro') && (
+                        <TextInput style={[styles.input, { marginLeft: 8, flex: 1 }]} placeholder="Describa la anomalía" value={otroElec} onChangeText={setOtroElec} />
+                      )}
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Observaciones */}
+          <View style={styles.card}>
+            <Text style={styles.inputLabel}>Observaciones</Text>
+            <TextInput
+              style={[styles.input, { minHeight: 60 }]}
+              placeholder="Ingrese cualquier información relevante"
+              value={observaciones}
+              onChangeText={setObservaciones}
+              multiline
+            />
+          </View>
+
           {/* Botón de siguiente */}
-          <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-            <Text style={styles.nextButtonText}>Siguiente</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
+            <TouchableOpacity style={[styles.button, { backgroundColor: '#eee' }]} onPress={handleBack}>
+              <Text style={{ color: '#333' }}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.button, { backgroundColor: '#ccc' }]} onPress={handleGenerateTicket}>
+              <Text style={{ color: '#333' }}>Generar Ticket</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -277,6 +540,26 @@ export default function NuevaCapturaScreen() {
           title="Foto del Medidor Volumétrico"
         />
       </Modal>
+
+      <TicketPreviewModal
+        visible={showPreview}
+        onClose={() => setShowPreview(false)}
+        onConfirm={async () => {
+          setShowPreview(false)
+          await handleConfirmar()
+        }}
+        ticketData={{
+          pozoNombre,
+          pozoId: pozoId,
+          volumen: lecturaVolumen,
+          gasto,
+          lecturaElectrica,
+          observaciones,
+          anomaliasVol,
+          anomaliasElec,
+          fecha: new Date().toLocaleDateString(),
+        }}
+      />
     </View>
   )
 }
@@ -434,17 +717,10 @@ const styles = StyleSheet.create({
   inputContainer: {
     marginBottom: 16,
   },
-  nextButton: {
-    backgroundColor: "#00A86B",
-    borderRadius: 8,
+  button: {
     padding: 16,
+    borderRadius: 8,
     alignItems: "center",
-    marginTop: 8,
-  },
-  nextButtonText: {
-    color: "white",
-    fontWeight: "bold",
-    fontSize: 16,
   },
 })
 

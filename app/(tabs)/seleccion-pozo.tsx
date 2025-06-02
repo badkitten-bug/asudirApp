@@ -41,6 +41,25 @@ export default function SeleccionPozoScreen() {
   const [searchQuery, setSearchQuery] = useState("")
   const [isSyncing, setIsSyncing] = useState(false)
 
+  // Sincronizar pozos reales al entrar a la pantalla
+  useEffect(() => {
+    const sync = async () => {
+      setIsSyncing(true)
+      try {
+        await dispatch(syncPozos()).unwrap()
+      } catch (error) {
+        dispatch(showSnackbar({
+          message: "Error al sincronizar pozos",
+          type: "error",
+          duration: 3000,
+        }))
+      } finally {
+        setIsSyncing(false)
+      }
+    }
+    sync()
+  }, [dispatch])
+
   // Filtrar pozos según la búsqueda
   const filteredPozos = pozos.filter(
     (pozo) =>
@@ -80,7 +99,6 @@ export default function SeleccionPozoScreen() {
 
   // Función para manejar la selección de un pozo
   const handleSelectPozo = (pozo: Pozo) => {
-    // Mostrar mensaje de confirmación
     dispatch(
       showSnackbar({
         message: `Pozo ${pozo.nombre} seleccionado`,
@@ -88,8 +106,7 @@ export default function SeleccionPozoScreen() {
         duration: 2000,
       })
     )
-    
-    // Navegar a la pantalla de captura con los datos del pozo
+    // Navegar usando el id numérico
     router.push({
       pathname: "/(tabs)/nueva-captura",
       params: {
@@ -137,6 +154,16 @@ export default function SeleccionPozoScreen() {
       return "Fecha inválida"
     }
   }
+
+  // Renderizar mensaje profesional si no hay pozos asignados
+  const renderEmptyComponent = () => (
+    <View style={{ padding: 24, alignItems: 'center' }}>
+      <Text style={{ color: '#888', fontSize: 16, textAlign: 'center' }}>
+        No tienes pozos asignados actualmente.
+        {"\n"}Contacta a tu administrador si crees que esto es un error.
+      </Text>
+    </View>
+  )
 
   return (
     <View style={styles.container}>
@@ -210,11 +237,14 @@ export default function SeleccionPozoScreen() {
       ) : (
         /* Lista de pozos */
         filteredPozos.length === 0 ? (
-          <View style={styles.emptySearchContainer}>
-            <Ionicons name="search-outline" size={64} color="#ccc" />
-            <Text style={styles.emptySearchText}>No se encontraron pozos</Text>
-            <Text style={styles.emptySearchSubtext}>Intente con otra búsqueda</Text>
-          </View>
+          <FlatList
+            data={filteredPozos}
+            renderItem={renderPozoItem}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={true}
+            ListEmptyComponent={renderEmptyComponent}
+          />
         ) : (
           <FlatList
             data={filteredPozos}

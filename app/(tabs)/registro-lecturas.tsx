@@ -19,7 +19,7 @@ import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import Constants from "expo-constants"
 import { useDispatch, useSelector } from "../../store"
-import { loadTickets, selectAllTickets, type Ticket } from "../../store/ticketsSlice"
+import { loadTickets, selectAllTickets, type Ticket as TicketBase } from "../../store/ticketsSlice"
 import { selectAllPozos } from "../../store/pozosSlice"
 import { showSnackbar } from "../../store/snackbarSlice"
 
@@ -42,18 +42,33 @@ const MESES = [
   { label: "Diciembre", value: "12" },
 ]
 
+// Tipo para los datos de lectura en la UI
+interface LecturaData {
+  fecha: string;
+  pozoNombre: string;
+  pozoUbicacion: string;
+  bateria: string;
+  usuario: string;
+  volumen: string | number;
+  gasto: string | number;
+  lecturaElectrica: string;
+  observaciones: string;
+  ticketNumero: string;
+  ticketId: string | null;
+  pozoId?: string; // ID del pozo para filtros
+}
+
 export default function RegistroLecturasScreen() {
   const router = useRouter()
   const dispatch = useDispatch()
-
-  // Obtener datos de Redux
-  const tickets = useSelector(selectAllTickets)
   const pozos = useSelector(selectAllPozos)
+  const user = useSelector((state: any) => state.auth.user)
 
-  // Estados para búsqueda y filtros
-  const [searchQuery, setSearchQuery] = useState("")
+  // Estado para lecturas reales del backend
+  const [lecturas, setLecturas] = useState<LecturaData[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [showFilters, setShowFilters] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
 
   // Estados para los filtros
   const [filtroPozo, setFiltroPozo] = useState("")
@@ -64,27 +79,39 @@ export default function RegistroLecturasScreen() {
   const [filtroFechaInicio, setFiltroFechaInicio] = useState("")
   const [filtroFechaFin, setFiltroFechaFin] = useState("")
 
-  // Cargar tickets al montar el componente
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchLecturas = async () => {
+      if (!user || !user.token) return;
+      setIsLoading(true)
       try {
-        await dispatch(loadTickets()).unwrap()
-      } catch (error) {
-        console.error("Error al cargar tickets:", error)
-        dispatch(
-          showSnackbar({
-            message: "Error al cargar las lecturas",
-            type: "error",
-            duration: 3000,
-          }),
-        )
+        const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/lectura-pozos?populate[ticket]=true&populate[pozo]=true&populate[usuario_pozo]=true&populate[ciclo]=true`, {
+          headers: { 'Authorization': `Bearer ${user.token}` }
+        })
+        const data = await res.json()
+        // Mapear cada lectura a un objeto para la UI
+        const lecturasMapped = (data.data ?? []).map((l: any) => ({
+          fecha: l.fecha ? l.fecha.split('T')[0] : 'No disponible',
+          pozoNombre: l.pozo?.numeropozo ?? 'No disponible',
+          pozoUbicacion: l.pozo?.predio ?? 'No disponible',
+          bateria: l.pozo?.bateria?.nombrebateria ?? 'No disponible',
+          usuario: l.usuario_pozo?.nombre ?? 'No disponible',
+          volumen: l.volumen ?? 'No disponible',
+          gasto: l.gasto ?? 'No disponible',
+          lecturaElectrica: l.lectura_electrica ?? 'No disponible',
+          observaciones: l.observaciones ?? 'Sin observaciones',
+          ticketNumero: l.ticket?.numeroTicket ?? 'No disponible',
+          ticketId: l.ticket?.id ?? null,
+          pozoId: l.pozo?.id,
+        }))
+        setLecturas(lecturasMapped)
+      } catch (e) {
+        setLecturas([])
       } finally {
         setIsLoading(false)
       }
     }
-
-    fetchData()
-  }, [dispatch])
+    fetchLecturas()
+  }, [user])
 
   // Obtener baterías únicas para el filtro
   const baterias = Array.from(new Set(pozos.map((pozo) => pozo.bateria)))
@@ -92,32 +119,31 @@ export default function RegistroLecturasScreen() {
   // Obtener años únicos para el filtro
   const anos = Array.from(
     new Set(
-      tickets
-        .map((ticket) => {
-          const fecha = ticket.fecha.split("-")
+      lecturas
+        .map((lectura) => {
+          const fecha = lectura.fecha.split("-")
           return fecha.length > 0 ? fecha[0] : ""
         })
         .filter(Boolean),
     ),
   ).sort((a, b) => b.localeCompare(a)) // Ordenar descendente
 
-  // Aplicar filtros a los tickets
-  const filteredTickets = tickets.filter((ticket) => {
+  // Aplicar filtros a las lecturas
+  const filteredLecturas = lecturas.filter((lectura) => {
     // Filtro por búsqueda
     const matchesSearch =
       searchQuery === "" ||
-      ticket.pozoId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ticket.pozoNombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ticket.pozoUbicacion.toLowerCase().includes(searchQuery.toLowerCase())
+      lectura.pozoNombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      lectura.pozoUbicacion.toLowerCase().includes(searchQuery.toLowerCase())
 
     // Filtro por pozo
-    const matchesPozo = filtroPozo === "" || ticket.pozoId === filtroPozo
+    const matchesPozo = filtroPozo === "" || lectura.pozoNombre === filtroPozo
 
     // Filtro por batería
-    const matchesBateria = filtroBateria === "" || pozos.find((p) => p.id === ticket.pozoId)?.bateria === filtroBateria
+    const matchesBateria = filtroBateria === "" || (lectura.pozoId && pozos.find((p) => p.id === lectura.pozoId)?.bateria === filtroBateria)
 
     // Filtrar por fecha
-    const fechaParts = ticket.fecha.split("-")
+    const fechaParts = lectura.fecha.split("-")
     const ano = fechaParts.length > 0 ? fechaParts[0] : ""
     const mes = fechaParts.length > 1 ? fechaParts[1] : ""
     const dia = fechaParts.length > 2 ? fechaParts[2] : ""
@@ -129,35 +155,17 @@ export default function RegistroLecturasScreen() {
     // Filtro por rango de fechas
     let matchesRangoFechas = true
     if (filtroFechaInicio !== "" && filtroFechaFin !== "") {
-      const fechaTicket = new Date(ticket.fecha)
+      const fechaLectura = new Date(lectura.fecha)
       const fechaInicio = new Date(filtroFechaInicio)
       const fechaFin = new Date(filtroFechaFin)
 
-      matchesRangoFechas = fechaTicket >= fechaInicio && fechaTicket <= fechaFin
+      matchesRangoFechas = fechaLectura >= fechaInicio && fechaLectura <= fechaFin
     }
 
     return (
       matchesSearch && matchesPozo && matchesBateria && matchesDia && matchesMes && matchesAno && matchesRangoFechas
     )
   })
-
-  // Función para manejar la selección de una lectura
-  const handleSelectLectura = (ticket: Ticket) => {
-    router.push({
-      pathname: "/(tabs)/ticket",
-      params: {
-        ticketId: ticket.id,
-        pozoId: ticket.pozoId,
-        pozoNombre: ticket.pozoNombre,
-        pozoUbicacion: ticket.pozoUbicacion,
-        lecturaVolumen: ticket.lecturaVolumen,
-        lecturaElectrica: ticket.lecturaElectrica,
-        cargaMotor: ticket.cargaMotor,
-        gastoPozo: ticket.gastoPozo,
-        observaciones: ticket.observaciones,
-      },
-    })
-  }
 
   // Función para limpiar todos los filtros
   const handleClearFilters = () => {
@@ -172,105 +180,65 @@ export default function RegistroLecturasScreen() {
   }
 
   // Renderizar cada item de la lista
-  const renderTicketItem = ({ item }: { item: Ticket }) => {
-    // Encontrar el pozo correspondiente para obtener la batería
-    const pozo = pozos.find((p) => p.id === item.pozoId)
-    const bateria = pozo?.bateria || "No disponible"
-
-    return (
-      <TouchableOpacity style={styles.ticketItem} onPress={() => handleSelectLectura(item)} activeOpacity={0.7}>
-        <View style={styles.ticketHeader}>
-          <View style={styles.ticketHeaderLeft}>
-            <Text style={styles.ticketId}>ID: {item.id.substring(0, 8)}</Text>
-            <Text style={styles.ticketFecha}>Fecha: {item.fecha}</Text>
-          </View>
-          
+  const renderLecturaItem = ({ item }: { item: any }) => (
+    <TouchableOpacity
+      style={styles.ticketItem}
+      onPress={() => {
+        if (item.ticketId) {
+          router.push({ pathname: "/ticket", params: { ticketDocumentId: item.ticketId } });
+        } else {
+          dispatch(showSnackbar({ message: "Este registro no tiene ticket generado.", type: "warning", duration: 2000 }));
+        }
+      }}
+    >
+      <View style={styles.ticketHeader}>
+        <View style={styles.ticketHeaderLeft}>
+          <Text style={styles.ticketId}>Ticket: {item.ticketNumero}</Text>
+          <Text style={styles.ticketFecha}>Fecha: {item.fecha}</Text>
         </View>
-
-        <View style={styles.ticketContent}>
-          <View style={styles.ticketRow}>
-            <Text style={styles.ticketLabel}>Pozo:</Text>
-            <Text style={styles.ticketValue}>{item.pozoNombre}</Text>
-          </View>
-
-          <View style={styles.ticketRow}>
-            <Text style={styles.ticketLabel}>Predio:</Text>
-            <Text style={styles.ticketValue}>{item.pozoUbicacion}</Text>
-          </View>
-
-          <View style={styles.ticketRow}>
-            <Text style={styles.ticketLabel}>Batería:</Text>
-            <Text style={styles.ticketValue}>{bateria}</Text>
-          </View>
-
-          <View style={styles.ticketRow}>
-            <Text style={styles.ticketLabel}>Lector:</Text>
-            <Text style={styles.ticketValue}>Juan Pérez</Text>
-          </View>
-
-          <View style={styles.ticketRow}>
-            <Text style={styles.ticketLabel}>Lectura Volumen:</Text>
-            <Text style={styles.ticketValue}>{item.lecturaVolumen}</Text>
-           
-          </View>
-
-          <View style={styles.ticketRow}>
-            <Text style={styles.ticketLabel}>Estado:</Text>
-            <Text style={styles.ticketValue}>Funcionando</Text>
-          </View>
-
-          <View style={styles.ticketRow}>
-            <Text style={styles.ticketLabel}>Extracción Manual:</Text>
-            <Text style={styles.ticketValue}>Normal</Text>
-          </View>
-
-          <View style={styles.ticketRow}>
-            <Text style={styles.ticketLabel}>Tipo de descarga:</Text>
-            <Text style={styles.ticketValue}>Libre</Text>
-          </View>
-
-          <View style={styles.ticketRow}>
-            <Text style={styles.ticketLabel}>Lectura Eléctrica:</Text>
-            <Text style={styles.ticketValue}>{item.lecturaElectrica}</Text>
-           
-          </View>
-
-          <View style={styles.ticketRow}>
-            <Text style={styles.ticketLabel}>Carga del Motor:</Text>
-            <Text style={styles.ticketValue}>{item.cargaMotor || "###"}</Text>
-          </View>
-
-          <View style={styles.ticketRow}>
-            <Text style={styles.ticketLabel}>Gasto del Pozo:</Text>
-            <Text style={styles.ticketValue}>{item.gastoPozo || "1234"}</Text>
-          </View>
-
-          <View style={styles.ticketRow}>
-            <Text style={styles.ticketLabel}>Distancia:</Text>
-            <Text style={styles.ticketValue}>Correcta</Text>
-          </View>
-
-          <View style={styles.ticketRow}>
-            <Text style={styles.ticketLabel}>Observaciones:</Text>
-            <Text style={styles.ticketValue}>{item.observaciones || "-"}</Text>
-          </View>
+      </View>
+      <View style={styles.ticketContent}>
+        <View style={styles.ticketRow}>
+          <Text style={styles.ticketLabel}>Pozo:</Text>
+          <Text style={styles.ticketValue}>{item.pozoNombre || 'Sin dato'}</Text>
         </View>
-      </TouchableOpacity>
-    )
-  }
-
-  // Renderizar separador entre items
-  const renderSeparator = () => <View style={styles.separator} />
+        <View style={styles.ticketRow}>
+          <Text style={styles.ticketLabel}>Predio:</Text>
+          <Text style={styles.ticketValue}>{item.pozoUbicacion || 'Sin dato'}</Text>
+        </View>
+        <View style={styles.ticketRow}>
+          <Text style={styles.ticketLabel}>Batería:</Text>
+          <Text style={styles.ticketValue}>{item.bateria || 'Sin dato'}</Text>
+        </View>
+        <View style={styles.ticketRow}>
+          <Text style={styles.ticketLabel}>Usuario:</Text>
+          <Text style={styles.ticketValue}>{item.usuario || 'Sin dato'}</Text>
+        </View>
+        <View style={styles.ticketRow}>
+          <Text style={styles.ticketLabel}>Lectura Volumen:</Text>
+          <Text style={styles.ticketValue}>{item.volumen || 'Sin dato'}</Text>
+        </View>
+        <View style={styles.ticketRow}>
+          <Text style={styles.ticketLabel}>Gasto:</Text>
+          <Text style={styles.ticketValue}>{item.gasto || 'Sin dato'}</Text>
+        </View>
+        <View style={styles.ticketRow}>
+          <Text style={styles.ticketLabel}>Lectura Eléctrica:</Text>
+          <Text style={styles.ticketValue}>{item.lecturaElectrica || 'Sin dato'}</Text>
+        </View>
+        <View style={styles.ticketRow}>
+          <Text style={styles.ticketLabel}>Observaciones:</Text>
+          <Text style={styles.ticketValue}>{item.observaciones || 'Sin observaciones'}</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  )
 
   // Renderizar mensaje cuando no hay resultados
   const renderEmptyList = () => (
     <View style={styles.emptyContainer}>
       <Ionicons name="document-text-outline" size={64} color="#ccc" />
-      <Text style={styles.emptyText}>No se encontraron lecturas</Text>
-      <Text style={styles.emptySubtext}>Intente con otros filtros o realice nuevas capturas</Text>
-      <TouchableOpacity style={styles.clearFiltersButton} onPress={handleClearFilters}>
-        <Text style={styles.clearFiltersText}>Limpiar filtros</Text>
-      </TouchableOpacity>
+      <Text style={styles.emptyText}>No hay lecturas registradas</Text>
     </View>
   )
 
@@ -310,7 +278,7 @@ export default function RegistroLecturasScreen() {
       {/* Indicadores de filtros activos */}
       {(filtroPozo || filtroBateria || filtroDia || filtroMes || filtroAno || filtroFechaInicio) && (
         <View style={styles.activeFiltersContainer}>
-          <Text style={styles.activeFiltersText}>Filtros activos: {filteredTickets.length} resultados</Text>
+          <Text style={styles.activeFiltersText}>Filtros activos: {filteredLecturas.length} resultados</Text>
           <TouchableOpacity onPress={handleClearFilters}>
             <Text style={styles.clearFiltersLink}>Limpiar</Text>
           </TouchableOpacity>
@@ -325,12 +293,11 @@ export default function RegistroLecturasScreen() {
         </View>
       ) : (
         <FlatList
-          data={filteredTickets}
-          renderItem={renderTicketItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          ItemSeparatorComponent={renderSeparator}
+          data={filteredLecturas}
+          renderItem={renderLecturaItem}
+          keyExtractor={(item) => item.ticketId ?? Math.random().toString()}
           ListEmptyComponent={renderEmptyList}
+          contentContainerStyle={styles.listContent}
         />
       )}
 
@@ -367,7 +334,7 @@ export default function RegistroLecturasScreen() {
                         onPress={() => setFiltroPozo(pozo.id)}
                       >
                         <Text style={[styles.filterChipText, filtroPozo === pozo.id && styles.filterChipTextSelected]}>
-                          {pozo.nombre}
+                          {pozo.nombre ? String(pozo.nombre) : 'Sin dato'}
                         </Text>
                       </TouchableOpacity>
                     ))}
@@ -391,14 +358,12 @@ export default function RegistroLecturasScreen() {
 
                     {baterias.map((bateria) => (
                       <TouchableOpacity
-                        key={bateria}
+                        key={bateria || 'sin-bateria'}
                         style={[styles.filterChip, filtroBateria === bateria && styles.filterChipSelected]}
                         onPress={() => setFiltroBateria(bateria)}
                       >
-                        <Text
-                          style={[styles.filterChipText, filtroBateria === bateria && styles.filterChipTextSelected]}
-                        >
-                          {bateria}
+                        <Text style={[styles.filterChipText, filtroBateria === bateria && styles.filterChipTextSelected]}>
+                          {bateria ? String(bateria) : 'Sin dato'}
                         </Text>
                       </TouchableOpacity>
                     ))}
@@ -422,12 +387,12 @@ export default function RegistroLecturasScreen() {
 
                     {anos.map((ano) => (
                       <TouchableOpacity
-                        key={ano}
+                        key={ano || 'sin-ano'}
                         style={[styles.filterChip, filtroAno === ano && styles.filterChipSelected]}
                         onPress={() => setFiltroAno(ano)}
                       >
                         <Text style={[styles.filterChipText, filtroAno === ano && styles.filterChipTextSelected]}>
-                          {ano}
+                          {ano ? String(ano) : 'Sin dato'}
                         </Text>
                       </TouchableOpacity>
                     ))}
@@ -456,7 +421,7 @@ export default function RegistroLecturasScreen() {
                         onPress={() => setFiltroMes(mes.value)}
                       >
                         <Text style={[styles.filterChipText, filtroMes === mes.value && styles.filterChipTextSelected]}>
-                          {mes.label}
+                          {mes.label ? String(mes.label) : 'Sin dato'}
                         </Text>
                       </TouchableOpacity>
                     ))}
@@ -557,10 +522,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 8,
     height: 40,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    boxShadow: "0px 1px 2px rgba(0, 0, 0, 0.1)",
     elevation: 2,
   },
   searchIcon: {
@@ -601,10 +563,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     marginBottom: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    boxShadow: "0px 1px 2px rgba(0, 0, 0, 0.1)",
     elevation: 1,
   },
   ticketHeader: {
