@@ -204,7 +204,7 @@ export default function NuevaCapturaScreen() {
           name: 'foto_volumetrico.jpg',
           type: 'image/jpeg',
         } as any)
-        const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/upload`, {
+        const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/upload`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${user.token}` },
           body: formData
@@ -221,7 +221,7 @@ export default function NuevaCapturaScreen() {
           name: 'foto_electrico.jpg',
           type: 'image/jpeg',
         } as any)
-        const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/upload`, {
+        const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/upload`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${user.token}` },
           body: formData
@@ -271,7 +271,7 @@ export default function NuevaCapturaScreen() {
       if (idFotoVol) (payload.data as any)["foto_volumetrico"] = idFotoVol
       if (idFotoElec) (payload.data as any)["foto_electrico"] = idFotoElec
       // POST a lectura-pozos
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/lectura-pozos`, {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/lectura-pozos`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -296,7 +296,7 @@ export default function NuevaCapturaScreen() {
       setLoadingPozo(true)
       try {
         // Usar id numérico en el endpoint y enviar el token en el header
-        const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/pozos/${pozoId}?populate[usuario_pozo]=true&populate[ciclo_agricola]=true`, {
+        const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/pozos/${pozoId}?populate[usuario_pozo]=true&populate[ciclo_agricola]=true`, {
           headers: {
             'Authorization': `Bearer ${user?.token}`,
             'Content-Type': 'application/json',

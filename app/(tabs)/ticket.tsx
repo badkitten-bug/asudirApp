@@ -365,7 +365,7 @@ export default function TicketScreen() {
       setLoadingTicket(true);
       try {
         const res = await fetch(
-          `${process.env.EXPO_PUBLIC_API_URL}/api/tickets/${ticketDocumentId}?populate[lectura]=true&populate[pozo]=true`,
+          `${process.env.EXPO_PUBLIC_API_URL}/tickets/${ticketDocumentId}?populate[lectura]=true&populate[pozo]=true`,
           {
             headers: { 'Authorization': `Bearer ${user.token}` }
           }
@@ -388,7 +388,7 @@ export default function TicketScreen() {
       if (!lecturaId || !user?.token) return;
       setLoadingPozoData(true);
       try {
-        const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/lectura-pozos/${lecturaId}?populate[pozo]=true`, {
+        const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/lectura-pozos/${lecturaId}?populate[pozo]=true`, {
           headers: { 'Authorization': `Bearer ${user.token}` }
         });
         const data = await res.json();
@@ -413,7 +413,7 @@ export default function TicketScreen() {
     try {
       // Obtener datos del pozo incluyendo batería y última lectura
       const res = await fetch(
-        `${process.env.EXPO_PUBLIC_API_URL}/api/pozos/${pozoId}?populate[bateria]=true&populate[lecturas][sort]=fecha:desc&populate[lecturas][limit]=2`,
+        `${process.env.EXPO_PUBLIC_API_URL}/pozos/${pozoId}?populate[bateria]=true&populate[lecturas][sort]=fecha:desc&populate[lecturas][limit]=2`,
         {
           headers: { 'Authorization': `Bearer ${user.token}` }
         }

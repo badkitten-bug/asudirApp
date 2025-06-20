@@ -84,7 +84,7 @@ export default function RegistroLecturasScreen() {
       if (!user || !user.token) return;
       setIsLoading(true)
       try {
-        const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/lectura-pozos?populate[ticket]=true&populate[pozo]=true&populate[usuario_pozo]=true&populate[ciclo]=true`, {
+        const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/lectura-pozos?populate[ticket]=true&populate[pozo]=true&populate[usuario_pozo]=true&populate[ciclo]=true`, {
           headers: { 'Authorization': `Bearer ${user.token}` }
         })
         const data = await res.json()

@@ -81,7 +81,7 @@ export const syncPozos = createAsyncThunk("pozos/syncPozos", async (_, { getStat
     // Usar la variable de entorno para la URL del backend
     const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
-    const response = await fetch(`${API_URL}/api/pozos-capturador/${userId}`, {
+    const response = await fetch(`${API_URL}/pozos-capturador/${userId}`, {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',

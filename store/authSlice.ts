@@ -163,7 +163,7 @@ export const validateCredentials = createAsyncThunk(
       }
       
       // Llamar a la API de autenticación con plataforma mobile
-      const response = await fetch(`${API_URL}/api/auth/custom/login`, {
+      const response = await fetch(`${API_URL}/auth/custom/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

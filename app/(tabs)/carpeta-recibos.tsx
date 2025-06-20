@@ -55,7 +55,7 @@ export default function CarpetaRecibosScreen() {
   // Buscar ticket por numeroTicket (case-insensitive)
   const buscarTicketPorCodigo = async (codigo: string, token: string) => {
     const codigoUpper = codigo.trim().toUpperCase();
-    const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/tickets?filters[numeroTicket][$containsi]=${codigoUpper}&populate[fotoTicket]=true`, {
+    const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/tickets?filters[numeroTicket][$containsi]=${codigoUpper}&populate[fotoTicket]=true`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     const data = await res.json();
@@ -69,7 +69,7 @@ export default function CarpetaRecibosScreen() {
   // Obtener todos los tickets firmados del backend
   const fetchTicketsBackend = async () => {
     if (!user?.token) return;
-    const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/tickets?populate[fotoTicket]=true`, {
+    const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/tickets?populate[fotoTicket]=true`, {
       headers: { 'Authorization': `Bearer ${user.token}` }
     });
     const data = await res.json();
@@ -123,7 +123,7 @@ export default function CarpetaRecibosScreen() {
   async function subirImagenWeb(file: File, token: string): Promise<number | undefined> {
     const formData = new FormData();
     formData.append('files', file);
-    const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/upload`, {
+    const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/upload`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -142,7 +142,7 @@ export default function CarpetaRecibosScreen() {
       name: 'ticket_firmado.jpg',
       type: 'image/jpeg',
     } as any); // <-- 'as any' para evitar error de tipo en React Native
-    const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/upload`, {
+    const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/upload`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -161,7 +161,7 @@ export default function CarpetaRecibosScreen() {
         fotoTicket: idImagen ? [idImagen] : [],
       }
     };
-    const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/tickets/${ticketId}`, {
+    const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/tickets/${ticketId}`, {
       method: 'PUT',
       headers: {
         'Authorization': `Bearer ${token}`,
