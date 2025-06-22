@@ -25,7 +25,7 @@ const TicketPreviewModal: React.FC<TicketPreviewModalProps> = ({ visible, onClos
       <View style={styles.overlay}>
         <View style={styles.modalContainer}>
           <ScrollView contentContainerStyle={styles.content}>
-            <Text style={styles.title}>Previsualización del Ticket</Text>
+            <Text style={styles.title}>Confirmar Lectura</Text>
             <Text style={styles.label}>Pozo:</Text>
             <Text style={styles.value}>{ticketData.pozoNombre} (ID: {ticketData.pozoId})</Text>
             <Text style={styles.label}>Fecha:</Text>
@@ -47,7 +47,7 @@ const TicketPreviewModal: React.FC<TicketPreviewModalProps> = ({ visible, onClos
                 <Text style={{ color: '#333' }}>Editar</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.button, { backgroundColor: '#00A86B' }]} onPress={onConfirm}>
-                <Text style={{ color: 'white' }}>Confirmar y Registrar</Text>
+                <Text style={{ color: 'white' }}>Guardar Lectura</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>

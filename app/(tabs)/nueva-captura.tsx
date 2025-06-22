@@ -27,6 +27,7 @@ import { selectUser } from '../../store/authSlice'
 // Importar el componente SelectDropdown
 import SelectDropdown from "../../components/SelectDropdown"
 import TicketPreviewModal from '../../components/TicketPreviewModal'
+import { addTicket } from '../../store/ticketsSlice'
 
 const STATUSBAR_HEIGHT = Constants.statusBarHeight || 0
 
@@ -88,6 +89,7 @@ export default function NuevaCapturaScreen() {
   const [lecturaVolumen, setLecturaVolumen] = useState("0")
   const [photoUri, setPhotoUri] = useState<string | null>(null)
   const [showCamera, setShowCamera] = useState(false)
+  const [showCameraElec, setShowCameraElec] = useState(false)
   const [gasto, setGasto] = useState('0')
   // Mostrar/ocultar anomalías
   const [mostrarAnomaliasVol, setMostrarAnomaliasVol] = useState(false)
@@ -172,6 +174,29 @@ export default function NuevaCapturaScreen() {
     setShowCamera(false)
   }
 
+  // Función para abrir la cámara del medidor eléctrico
+  const handleOpenCameraElec = () => {
+    setShowCameraElec(true)
+  }
+
+  // Función para manejar la foto del medidor eléctrico
+  const handlePhotoTakenElec = (uri: string) => {
+    setPhotoUriElec(uri)
+    setShowCameraElec(false)
+    dispatch(
+      showSnackbar({
+        message: "Foto del medidor eléctrico guardada correctamente",
+        type: "success",
+        duration: 2000,
+      }),
+    )
+  }
+
+  // Función para cerrar la cámara del medidor eléctrico
+  const handleCloseCameraElec = () => {
+    setShowCameraElec(false)
+  }
+
   // Checkbox handler
   const handleCheck = (arr: string[], setArr: (v: string[]) => void, value: string) => {
     if (arr.includes(value)) {
@@ -195,6 +220,32 @@ export default function NuevaCapturaScreen() {
         dispatch(showSnackbar({ message: 'No se pudo obtener pozo, usuario_pozo o ciclo', type: 'error', duration: 3000 }))
         return
       }
+
+      // 1. GENERAR TICKET LOCAL (para constancia del capturador)
+      const ticketLocal = {
+        id: `TICKET-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        pozoId: pozoInfo.id,
+        pozoNombre,
+        pozoUbicacion,
+        lecturaVolumen,
+        gasto,
+        lecturaElectrica,
+        observaciones,
+        anomaliasVol,
+        anomaliasElec,
+        fecha: new Date().toISOString().split("T")[0],
+        hora: new Date().toTimeString().split(" ")[0],
+        estado: "pendiente" as const,
+        photoVolumen: photoUri,
+        photoElectrica: photoUriElec,
+        capturador: user.name,
+        timestamp: new Date().toISOString(),
+      }
+
+      // Guardar ticket local en el store
+      dispatch(addTicket(ticketLocal))
+
+      // 2. ENVIAR AL BACKEND
       // Subir foto volumétrica si existe
       let idFotoVol = null
       if (photoUri) {
@@ -212,6 +263,7 @@ export default function NuevaCapturaScreen() {
         const data = await res.json()
         idFotoVol = data[0]?.id
       }
+      
       // Subir foto eléctrica si existe
       let idFotoElec = null
       if (photoUriElec) {
@@ -229,7 +281,8 @@ export default function NuevaCapturaScreen() {
         const data = await res.json()
         idFotoElec = data[0]?.id
       }
-      // Armar el payload usando los IDs numéricos
+      
+      // Armar el payload para el backend
       const payload: any = {
         data: {
           fecha: new Date().toISOString(),
@@ -241,35 +294,38 @@ export default function NuevaCapturaScreen() {
           usuario_pozo: pozoInfo.usuario_pozo.id,
           ciclo: pozoInfo.ciclo_agricola.id,
           estado: "pendiente",
+          ticket_id: ticketLocal.id, // Referencia al ticket local
         }
       }
+      
       // Solo agregar anomalías si hay alguna seleccionada
       if (mostrarAnomaliasVol && anomaliasVol.length > 0) {
-        // Validar que todas las anomalías sean válidas
         const anomaliasVolValidas = anomaliasVol.filter(anomalia => 
           ["Medidor Apagado", "Sin medidor", "Pozo encendido, medidor no marca gasto", 
            "Sin Acceso", "Lectura ilegible", "Cambio de Medidor", "Otro"].includes(anomalia)
         )
         if (anomaliasVolValidas.length > 0) {
-          payload.data.anomalias_volumetrico = anomaliasVolValidas // Enviar como array
+          payload.data.anomalias_volumetrico = anomaliasVolValidas
           if (otroVol) payload.data.detalle_otro_volumetrico = otroVol
           if (cambioSerieVol) payload.data.detalle_cambio_medidor_volumetrico = cambioSerieVol
         }
       }
+      
       if (mostrarAnomaliasElec && anomaliasElec.length > 0) {
-        // Validar que todas las anomalías sean válidas
         const anomaliasElecValidas = anomaliasElec.filter(anomalia => 
           ["Medidor Apagado", "Sin medidor", "Sin Acceso", 
            "Lectura ilegible", "Cambio de Medidor", "Otro"].includes(anomalia)
         )
         if (anomaliasElecValidas.length > 0) {
-          payload.data.anomalias_electrico = anomaliasElecValidas // Enviar como array
+          payload.data.anomalias_electrico = anomaliasElecValidas
           if (otroElec) payload.data.detalle_otro_electrico = otroElec
           if (cambioSerieElec) payload.data.detalle_cambio_medidor_electrico = cambioSerieElec
         }
       }
+      
       if (idFotoVol) (payload.data as any)["foto_volumetrico"] = idFotoVol
       if (idFotoElec) (payload.data as any)["foto_electrico"] = idFotoElec
+      
       // POST a lectura-pozos
       const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/lectura-pozos`, {
         method: 'POST',
@@ -279,15 +335,45 @@ export default function NuevaCapturaScreen() {
         },
         body: JSON.stringify(payload)
       })
+      
       if (!response.ok) {
-        throw new Error('Error al guardar la lectura')
+        throw new Error('Error al guardar la lectura en el servidor')
       }
+      
       const result = await response.json()
-      dispatch(showSnackbar({ message: 'Lectura guardada correctamente', type: 'success', duration: 2000 }))
-      // Redirigir al ticket generado pasando el id de la lectura
-      router.push({ pathname: '/(tabs)/ticket', params: { lecturaId: result.id, pozoId: pozoInfo.id, pozoNombre, pozoUbicacion, lecturaVolumen, lecturaElectrica, gasto, observaciones } })
+      
+      // 3. MOSTRAR CONFIRMACIÓN Y NAVEGAR AL TICKET
+      dispatch(showSnackbar({ 
+        message: 'Lectura guardada correctamente. Ticket generado.', 
+        type: 'success', 
+        duration: 3000 
+      }))
+      
+      // Navegar al ticket generado
+      setTimeout(() => {
+        router.push({ 
+          pathname: '/(tabs)/ticket', 
+          params: { 
+            ticketId: ticketLocal.id,
+            lecturaId: result.data?.id,
+            pozoId: pozoInfo.id, 
+            pozoNombre, 
+            pozoUbicacion, 
+            lecturaVolumen, 
+            lecturaElectrica, 
+            gasto, 
+            observaciones 
+          } 
+        })
+      }, 2000)
+      
     } catch (error: any) {
-      dispatch(showSnackbar({ message: error?.message || 'Error inesperado', type: 'error', duration: 3000 }))
+      console.error('Error en handleConfirmar:', error)
+      dispatch(showSnackbar({ 
+        message: error?.message || 'Error al procesar la lectura', 
+        type: 'error', 
+        duration: 3000 
+      }))
     }
   }
 
@@ -471,13 +557,13 @@ export default function NuevaCapturaScreen() {
             {photoUriElec ? (
               <View style={styles.photoPreviewContainer}>
                 <Image source={{ uri: photoUriElec }} style={styles.photoPreview} />
-                <TouchableOpacity style={styles.retakeButton} onPress={() => setShowCamera(true)}>
+                <TouchableOpacity style={styles.retakeButton} onPress={handleOpenCameraElec}>
                   <Ionicons name="camera" size={20} color="white" />
                   <Text style={styles.photoButtonText}>Volver a tomar</Text>
                 </TouchableOpacity>
               </View>
             ) : (
-              <TouchableOpacity style={styles.photoButton} onPress={() => setShowCamera(true)}>
+              <TouchableOpacity style={styles.photoButton} onPress={handleOpenCameraElec}>
                 <Ionicons name="camera-outline" size={20} color="white" />
                 <Text style={styles.photoButtonText}>Tomar Foto</Text>
               </TouchableOpacity>
@@ -525,8 +611,8 @@ export default function NuevaCapturaScreen() {
             <TouchableOpacity style={[styles.button, { backgroundColor: '#eee' }]} onPress={handleBack}>
               <Text style={{ color: '#333' }}>Cancelar</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.button, { backgroundColor: '#ccc' }]} onPress={handleGenerateTicket}>
-              <Text style={{ color: '#333' }}>Generar Ticket</Text>
+            <TouchableOpacity style={[styles.button, { backgroundColor: '#00A86B' }]} onPress={handleGenerateTicket}>
+              <Text style={{ color: '#fff', fontWeight: 'bold' }}>Guardar Lectura</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -538,6 +624,15 @@ export default function NuevaCapturaScreen() {
           onPhotoTaken={handlePhotoTaken}
           onClose={handleCloseCamera}
           title="Foto del Medidor Volumétrico"
+        />
+      </Modal>
+
+      {/* Modal de cámara para medidor eléctrico */}
+      <Modal visible={showCameraElec} animationType="slide" onRequestClose={handleCloseCameraElec}>
+        <CameraScreen
+          onPhotoTaken={handlePhotoTakenElec}
+          onClose={handleCloseCameraElec}
+          title="Foto del Medidor Eléctrico"
         />
       </Modal>
 

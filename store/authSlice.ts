@@ -157,6 +157,7 @@ export const validateCredentials = createAsyncThunk(
       
       // Usar la variable de entorno para la URL del backend
       const API_URL = process.env.EXPO_PUBLIC_API_URL
+      console.log('--- INTENTANDO CONECTAR A ESTA URL:', API_URL, '---'); // DEBUG
       
       if (!API_URL) {
         throw new Error('La URL del backend no está configurada');

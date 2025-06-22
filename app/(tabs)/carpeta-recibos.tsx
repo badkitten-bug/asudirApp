@@ -23,7 +23,7 @@ import { showSnackbar } from "../../store/snackbarSlice"
 import CameraScreen from "../../components/CameraScreen"
 import { addSignedTicket, selectAllSignedTickets, type SignedTicket } from "../../store/signedTicketsSlice"
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import NetInfo from '@react-native-community/netinfo';
+// import NetInfo from '@react-native-community/netinfo';
 
 const STATUSBAR_HEIGHT = Constants.statusBarHeight || 0
 
@@ -50,7 +50,7 @@ export default function CarpetaRecibosScreen() {
   const [selectedTicket, setSelectedTicket] = useState<any>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
 
-  const baseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+  const baseUrl = process.env.EXPO_PUBLIC_API_URL;
 
   // Buscar ticket por numeroTicket (case-insensitive)
   const buscarTicketPorCodigo = async (codigo: string, token: string) => {
@@ -210,12 +210,12 @@ export default function CarpetaRecibosScreen() {
 
   // Hook para sincronizar cuando vuelva la conexión
   useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener((state: any) => {
-      if (state.isConnected) {
-        sincronizarPendientes();
-      }
-    });
-    return () => unsubscribe();
+    // const unsubscribe = NetInfo.addEventListener((state: any) => {
+    //   if (state.isConnected) {
+    //     sincronizarPendientes();
+    //   }
+    // });
+    // return () => unsubscribe();
   }, []);
 
   // Función para guardar el ticket firmado
@@ -238,21 +238,21 @@ export default function CarpetaRecibosScreen() {
         return;
       }
       // Verificar conexión
-      const netInfo = await NetInfo.fetch();
-      if (!netInfo.isConnected) {
-        // Guardar pendiente localmente
-        await guardarPendiente({
-          id: ticketObj.id,
-          photoUri,
-          fechaFirma: new Date().toISOString(),
-        });
-        dispatch(showSnackbar({ message: "Sin conexión. El ticket se guardará y se sincronizará automáticamente cuando vuelva la conexión.", type: "info", duration: 4000 }));
-        setShowForm(false);
-        setTicketId('');
-        setPhotoUri(null);
-        setIsLoading(false);
-        return;
-      }
+      // const netInfo = await NetInfo.fetch();
+      // if (!netInfo.isConnected) {
+      //   // Guardar pendiente localmente
+      //   await guardarPendiente({
+      //     id: ticketObj.id,
+      //     photoUri,
+      //     fechaFirma: new Date().toISOString(),
+      //   });
+      //   dispatch(showSnackbar({ message: "Sin conexión. El ticket se guardará y se sincronizará automáticamente cuando vuelva la conexión.", type: "info", duration: 4000 }));
+      //   setShowForm(false);
+      //   setTicketId('');
+      //   setPhotoUri(null);
+      //   setIsLoading(false);
+      //   return;
+      // }
       // 1. Subir la imagen
       let idImagen: number | undefined = undefined;
       if (Platform.OS === 'web') {
