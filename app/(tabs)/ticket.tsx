@@ -249,14 +249,18 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderTopWidth: 1,
     borderTopColor: "#eee",
+    gap: 12,
   },
   actionButton: {
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: "#f0f0f0",
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    width: 50,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    backgroundColor: "#00A86B",
+    flex: 1,
+    minHeight: 48,
   },
   printButton: {
     flexDirection: "row",
@@ -273,6 +277,7 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "bold",
     marginLeft: 8,
+    fontSize: 16,
   },
   loadingOverlay: {
     position: "absolute",
@@ -310,6 +315,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  backButton: {
+    padding: 8,
+  },
 })
 
 export default function TicketScreen() {
@@ -327,17 +335,32 @@ export default function TicketScreen() {
   const [loadingTicket, setLoadingTicket] = useState(false);
   const [pozoData, setPozoData] = useState<any>(null);
   const [loadingPozoData, setLoadingPozoData] = useState(false);
-  const user = useSelector((state: any) => state.auth.user);
+  const user = useSelector((state: any) => state.auth.user)
   const lecturaId = (params.lecturaId as string) ?? null;
   const [lecturaActualDirecta, setLecturaActualDirecta] = useState<any>(null);
   const [lecturaAnteriorDirecta, setLecturaAnteriorDirecta] = useState<any>(null);
 
-  // Modificar para asegurar que siempre haya datos, incluso si no se pasan parámetros
-  // Datos del pozo y lecturas
+  // Datos recibidos directamente desde el registro de lecturas
   const pozoId = (params.pozoId as string) ?? "1003"
-  const fecha = new Date().toISOString().split("T")[0]
+  const fecha = (params.fecha as string) ?? new Date().toISOString().split("T")[0]
   const hora = new Date().toTimeString().split(" ")[0]
   const ticketId = (params.ticketId as string) ?? ""
+  
+  // Datos de la lectura recibidos como parámetros
+  const lecturaFromParams = {
+    pozoNombre: params.pozoNombre as string,
+    pozoUbicacion: params.pozoUbicacion as string,
+    volumen: params.volumen as string,
+    gasto: params.gasto as string,
+    lecturaElectrica: params.lecturaElectrica as string,
+    observaciones: params.observaciones as string,
+    bateria: params.bateria as string,
+    usuario: params.usuario as string,
+    ticketNumero: params.ticketNumero as string,
+  }
+
+  // Verificar si tenemos datos de lectura desde parámetros
+  const hasLecturaData = lecturaFromParams.pozoNombre && lecturaFromParams.volumen;
 
   // Verificar si el ticket ya existe
   useEffect(() => {
@@ -507,178 +530,15 @@ export default function TicketScreen() {
   const handlePrint = async () => {
     try {
       setIsLoading(true);
-      await saveTicketIfNeeded();
-
-      // Variables locales para el ticket de impresión
-      const lectura: any = ticketData?.lectura ?? {};
-      const pozo: any = lectura?.pozo ?? {};
-      const bateria: any = pozo?.bateria ?? {};
-      const lecturaAnterior: any = ticketData?.lecturaAnterior ?? null;
-
-      // Preparar datos para impresión
-      const printData = {
-        bateria: bateria?.nombrebateria ?? 'N/A',
-        pozo: pozo?.numeropozo ?? 'N/A',
-        predio: pozo?.predio ?? 'N/A',
-        fecha: ticketData?.fecha?.split('T')[0] ?? '',
-        hora: ticketData?.fecha?.split('T')[1] ?? '',
-        numeroSerieVol: mostrarValor(lectura?.numero_serie_volumetrico),
-        numeroSerieElec: mostrarValor(lectura?.numero_serie_electrico),
-        lecturaActualVol: mostrarLectura(lectura?.volumen),
-        lecturaAnteriorVol: lecturaAnterior ? mostrarLectura(lecturaAnterior?.volumen) : "Primera lectura",
-        consumoVol: lecturaAnterior ? mostrarLectura(lectura?.volumen - lecturaAnterior?.volumen) : "No calculable",
-        lecturaActualElec: mostrarLectura(lectura?.lectura_electrica),
-        lecturaAnteriorElec: lecturaAnterior ? mostrarLectura(lecturaAnterior?.lectura_electrica) : "Primera lectura",
-        consumoElec: lecturaAnterior ? mostrarLectura(lectura?.lectura_electrica - lecturaAnterior?.lectura_electrica) : "No calculable",
-        eficienciaActual: lecturaAnterior ? mostrarLectura(lectura?.eficiencia) + " m³/kWh" : "Sin registro",
-        eficienciaPromedioHistorica: mostrarLectura(ticketData?.eficienciaPromedioHistorica),
-        anomaliasVol: Array.isArray(lectura?.anomalias_volumetrico) ? lectura.anomalias_volumetrico.join(', ') : "Ninguna",
-        anomaliasElec: Array.isArray(lectura?.anomalias_electrico) ? lectura.anomalias_electrico.join(', ') : "Ninguna",
-        observaciones: mostrarValor(lectura?.observaciones, "Sin observaciones"),
-        codigo: ticketData?.numeroTicket ?? 'N/A',
-      };
-
-      // Generar HTML para impresión
-      const html = `
-      <html>
-        <head>
-          <meta name="viewport" content="width=380, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
-          <style>
-            body {
-              font-family: 'Courier New', Courier, monospace;
-              padding: 0;
-              margin: 0;
-              font-size: 11px;
-              width: 58mm;
-              max-width: 58mm;
-              background: #fff;
-            }
-            .ticket {
-              width: 58mm;
-              max-width: 58mm;
-              margin: 0 auto;
-              padding: 4px 0;
-            }
-            .center { text-align: center; }
-            .bold { font-weight: bold; }
-            .row {
-              display: flex;
-              justify-content: space-between;
-              margin-bottom: 2px;
-            }
-            .line {
-              border-top: 1px dashed #000;
-              margin: 4px 0;
-            }
-            .section { margin-bottom: 6px; }
-            .label { font-weight: bold; }
-            .small { font-size: 10px; }
-          </style>
-        </head>
-        <body>
-          <div class="ticket">
-            <div class="center bold">051</div>
-            <div class="center">ASOCIACIÓN DE USUARIOS DEL DISTRITO DE RIEGO</div>
-            <div class="center">NÚMERO 051 COSTA DE HERMOSILLO, A.C.</div>
-            <div class="center bold">Código del Ticket: ${printData.codigo}</div>
-            <div class="line"></div>
-            <div class="row">
-              <span class="label">Batería:</span> <span>${printData.bateria}</span>
-              <span class="label">Pozo:</span> <span>${printData.pozo}</span>
-          </div>
-            <div class="row">
-              <span class="label">Predio:</span> <span>${printData.predio}</span>
-          </div>
-            <div class="row">
-              <span class="label">Fecha:</span> <span>${printData.fecha}</span>
-              <span class="label">Hora:</span> <span>${printData.hora}</span>
-          </div>
-            <div class="line"></div>
-            <div class="section">
-              <div class="bold">LECTURAS DEL MES:</div>
-              <div class="small">- Medidor Volumétrico: ${printData.numeroSerieVol}</div>
-              <div class="row">
-              <span>Lectura Actual (m³):</span>
-                <span>${printData.lecturaActualVol}</span>
-            </div>
-              <div class="row">
-              <span>Lectura Anterior (m³):</span>
-                <span>${printData.lecturaAnteriorVol}</span>
-            </div>
-              <div class="row">
-              <span>Consumo del Mes (m³):</span>
-                <span>${printData.consumoVol}</span>
-            </div>
-              <div class="row">
-                <span>Anomalías:</span>
-                <span>${printData.anomaliasVol}</span>
-          </div>
-              <div class="small">- Medidor Eléctrico: ${printData.numeroSerieElec}</div>
-              <div class="row">
-              <span>Lectura Actual (kWh):</span>
-                <span>${printData.lecturaActualElec}</span>
-            </div>
-              <div class="row">
-              <span>Lectura Anterior (kWh):</span>
-                <span>${printData.lecturaAnteriorElec}</span>
-            </div>
-              <div class="row">
-              <span>Consumo del Mes (kWh):</span>
-                <span>${printData.consumoElec}</span>
-            </div>
-              <div class="row">
-                <span>Anomalías:</span>
-                <span>${printData.anomaliasElec}</span>
-          </div>
-            </div>
-            <div class="line"></div>
-            <div class="section">
-              <div class="bold">EFICIENCIA DETECTADA:</div>
-              <div class="row">
-            <span>Eficiencia Actual:</span>
-                <span>${printData.eficienciaActual}</span>
-          </div>
-              <div class="row">
-                <span>Eficiencia Promedio:</span>
-                <span>${printData.eficienciaPromedioHistorica} m³/kWh</span>
-          </div>
-          </div>
-            <div class="line"></div>
-            <div class="section">
-              <div class="bold">OBSERVACIONES:</div>
-              <div>${printData.observaciones}</div>
-          </div>
-            <div class="center small">Gracias por su registro</div>
-          </div>
-        </body>
-      </html>`;
-
-      if (Platform.OS === "web") {
-        // En web, usar window.print()
-        const printWindow = window.open('', '_blank');
-        printWindow?.document.write(html);
-        printWindow?.document.close();
-        printWindow?.focus();
-        printWindow?.print();
-        printWindow?.close();
+      
+      // Si tenemos datos de parámetros, usarlos directamente
+      if (hasLecturaData) {
+        await printFromParams();
       } else {
-        // En móvil, usar expo-print y expo-sharing
-        const { uri } = await Print.printToFileAsync({ html, width: 380, height: 900, base64: false });
-      if (Platform.OS === "ios") {
-          await Sharing.shareAsync(uri);
-      } else {
-          const pdfName = `ticket_${pozoId}_${Date.now()}.pdf`;
-          const newUri = `${FileSystem.documentDirectory}${pdfName}`;
-          await FileSystem.moveAsync({ from: uri, to: newUri });
-          await Sharing.shareAsync(newUri);
-        }
+        // Usar datos del backend
+        await saveTicketIfNeeded();
+        await printFromBackend();
       }
-
-      dispatch(showSnackbar({
-          message: "Ticket listo para imprimir",
-          type: "success",
-          duration: 3000,
-      }));
     } catch (error) {
       console.error("Error al imprimir ticket:", error);
       dispatch(showSnackbar({
@@ -689,6 +549,296 @@ export default function TicketScreen() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Función para imprimir desde datos de parámetros
+  const printFromParams = async () => {
+    // Preparar datos para impresión desde parámetros
+    const printData = {
+      bateria: mostrarValor(lecturaFromParams.bateria),
+      pozo: mostrarValor(lecturaFromParams.pozoNombre),
+      predio: mostrarValor(lecturaFromParams.pozoUbicacion),
+      fecha: mostrarValor(fecha),
+      hora: hora,
+      usuario: mostrarValor(lecturaFromParams.usuario),
+      lecturaActualVol: mostrarLectura(lecturaFromParams.volumen),
+      gasto: mostrarLectura(lecturaFromParams.gasto),
+      lecturaActualElec: mostrarLectura(lecturaFromParams.lecturaElectrica),
+      observaciones: mostrarValor(lecturaFromParams.observaciones, "Sin observaciones"),
+      codigo: lecturaFromParams.ticketNumero || 'N/A',
+    };
+
+    // Generar HTML para impresión
+    const html = `
+    <html>
+      <head>
+        <meta name="viewport" content="width=380, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
+        <style>
+          body {
+            font-family: 'Courier New', Courier, monospace;
+            padding: 0;
+            margin: 0;
+            font-size: 11px;
+            width: 58mm;
+            max-width: 58mm;
+            background: #fff;
+          }
+          .ticket {
+            width: 58mm;
+            max-width: 58mm;
+            margin: 0 auto;
+            padding: 4px 0;
+          }
+          .center { text-align: center; }
+          .bold { font-weight: bold; }
+          .row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 2px;
+          }
+          .line {
+            border-top: 1px dashed #000;
+            margin: 4px 0;
+          }
+          .section { margin-bottom: 6px; }
+          .label { font-weight: bold; }
+          .small { font-size: 10px; }
+        </style>
+      </head>
+      <body>
+        <div class="ticket">
+          <div class="center bold">051</div>
+          <div class="center">ASOCIACIÓN DE USUARIOS DEL DISTRITO DE RIEGO</div>
+          <div class="center">NÚMERO 051 COSTA DE HERMOSILLO, A.C.</div>
+          <div class="center bold">Código del Ticket: ${printData.codigo}</div>
+          <div class="line"></div>
+          <div class="row">
+            <span class="label">Batería:</span> <span>${printData.bateria}</span>
+            <span class="label">Pozo:</span> <span>${printData.pozo}</span>
+        </div>
+          <div class="row">
+            <span class="label">Predio:</span> <span>${printData.predio}</span>
+        </div>
+          <div class="row">
+            <span class="label">Fecha:</span> <span>${printData.fecha}</span>
+            <span class="label">Hora:</span> <span>${printData.hora}</span>
+        </div>
+          <div class="line"></div>
+          <div class="section">
+            <div class="bold">LECTURAS DEL MES:</div>
+            <div class="small">- Medidor Volumétrico</div>
+            <div class="row">
+            <span>Lectura Actual (m³):</span>
+              <span>${printData.lecturaActualVol}</span>
+          </div>
+            <div class="row">
+            <span>Gasto (l/s):</span>
+              <span>${printData.gasto}</span>
+          </div>
+            <div class="small">- Medidor Eléctrico</div>
+            <div class="row">
+            <span>Lectura Actual (kWh):</span>
+              <span>${printData.lecturaActualElec}</span>
+          </div>
+          </div>
+          <div class="line"></div>
+          <div class="section">
+            <div class="bold">INFORMACIÓN DEL USUARIO:</div>
+            <div class="row">
+          <span>Usuario:</span>
+              <span>${printData.usuario}</span>
+        </div>
+          </div>
+          <div class="line"></div>
+          <div class="section">
+            <div class="bold">OBSERVACIONES:</div>
+            <div>${printData.observaciones}</div>
+        </div>
+          <div class="center small">Gracias por su registro</div>
+        </div>
+      </body>
+    </html>`;
+
+    await printHTML(html);
+  };
+
+  // Función para imprimir desde datos del backend
+  const printFromBackend = async () => {
+    // Variables locales para el ticket de impresión
+    const lectura: any = ticketData?.lectura ?? {};
+    const pozo: any = lectura?.pozo ?? {};
+    const bateria: any = pozo?.bateria ?? {};
+    const lecturaAnterior: any = ticketData?.lecturaAnterior ?? null;
+
+    // Preparar datos para impresión
+    const printData = {
+      bateria: bateria?.nombrebateria ?? 'N/A',
+      pozo: pozo?.numeropozo ?? 'N/A',
+      predio: pozo?.predio ?? 'N/A',
+      fecha: ticketData?.fecha?.split('T')[0] ?? '',
+      hora: ticketData?.fecha?.split('T')[1] ?? '',
+      numeroSerieVol: mostrarValor(lectura?.numero_serie_volumetrico),
+      numeroSerieElec: mostrarValor(lectura?.numero_serie_electrico),
+      lecturaActualVol: mostrarLectura(lectura?.volumen),
+      lecturaAnteriorVol: lecturaAnterior ? mostrarLectura(lecturaAnterior?.volumen) : "Primera lectura",
+      consumoVol: lecturaAnterior ? mostrarLectura(lectura?.volumen - lecturaAnterior?.volumen) : "No calculable",
+      lecturaActualElec: mostrarLectura(lectura?.lectura_electrica),
+      lecturaAnteriorElec: lecturaAnterior ? mostrarLectura(lecturaAnterior?.lectura_electrica) : "Primera lectura",
+      consumoElec: lecturaAnterior ? mostrarLectura(lectura?.lectura_electrica - lecturaAnterior?.lectura_electrica) : "No calculable",
+      eficienciaActual: lecturaAnterior ? mostrarLectura(lectura?.eficiencia) + " m³/kWh" : "Sin registro",
+      eficienciaPromedioHistorica: mostrarLectura(ticketData?.eficienciaPromedioHistorica),
+      anomaliasVol: Array.isArray(lectura?.anomalias_volumetrico) ? lectura.anomalias_volumetrico.join(', ') : "Ninguna",
+      anomaliasElec: Array.isArray(lectura?.anomalias_electrico) ? lectura.anomalias_electrico.join(', ') : "Ninguna",
+      observaciones: mostrarValor(lectura?.observaciones, "Sin observaciones"),
+      codigo: ticketData?.numeroTicket ?? 'N/A',
+    };
+
+    // Generar HTML para impresión
+    const html = `
+    <html>
+      <head>
+        <meta name="viewport" content="width=380, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
+        <style>
+          body {
+            font-family: 'Courier New', Courier, monospace;
+            padding: 0;
+            margin: 0;
+            font-size: 11px;
+            width: 58mm;
+            max-width: 58mm;
+            background: #fff;
+          }
+          .ticket {
+            width: 58mm;
+            max-width: 58mm;
+            margin: 0 auto;
+            padding: 4px 0;
+          }
+          .center { text-align: center; }
+          .bold { font-weight: bold; }
+          .row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 2px;
+          }
+          .line {
+            border-top: 1px dashed #000;
+            margin: 4px 0;
+          }
+          .section { margin-bottom: 6px; }
+          .label { font-weight: bold; }
+          .small { font-size: 10px; }
+        </style>
+      </head>
+      <body>
+        <div class="ticket">
+          <div class="center bold">051</div>
+          <div class="center">ASOCIACIÓN DE USUARIOS DEL DISTRITO DE RIEGO</div>
+          <div class="center">NÚMERO 051 COSTA DE HERMOSILLO, A.C.</div>
+          <div class="center bold">Código del Ticket: ${printData.codigo}</div>
+          <div class="line"></div>
+          <div class="row">
+            <span class="label">Batería:</span> <span>${printData.bateria}</span>
+            <span class="label">Pozo:</span> <span>${printData.pozo}</span>
+        </div>
+          <div class="row">
+            <span class="label">Predio:</span> <span>${printData.predio}</span>
+        </div>
+          <div class="row">
+            <span class="label">Fecha:</span> <span>${printData.fecha}</span>
+            <span class="label">Hora:</span> <span>${printData.hora}</span>
+        </div>
+          <div class="line"></div>
+          <div class="section">
+            <div class="bold">LECTURAS DEL MES:</div>
+            <div class="small">- Medidor Volumétrico: ${printData.numeroSerieVol}</div>
+            <div class="row">
+            <span>Lectura Actual (m³):</span>
+              <span>${printData.lecturaActualVol}</span>
+          </div>
+            <div class="row">
+            <span>Lectura Anterior (m³):</span>
+              <span>${printData.lecturaAnteriorVol}</span>
+          </div>
+            <div class="row">
+            <span>Consumo del Mes (m³):</span>
+              <span>${printData.consumoVol}</span>
+          </div>
+            <div class="row">
+              <span>Anomalías:</span>
+              <span>${printData.anomaliasVol}</span>
+        </div>
+            <div class="small">- Medidor Eléctrico: ${printData.numeroSerieElec}</div>
+            <div class="row">
+            <span>Lectura Actual (kWh):</span>
+              <span>${printData.lecturaActualElec}</span>
+          </div>
+            <div class="row">
+            <span>Lectura Anterior (kWh):</span>
+              <span>${printData.lecturaAnteriorElec}</span>
+          </div>
+            <div class="row">
+            <span>Consumo del Mes (kWh):</span>
+              <span>${printData.consumoElec}</span>
+          </div>
+            <div class="row">
+              <span>Anomalías:</span>
+              <span>${printData.anomaliasElec}</span>
+        </div>
+          </div>
+          <div class="line"></div>
+          <div class="section">
+            <div class="bold">EFICIENCIA DETECTADA:</div>
+            <div class="row">
+          <span>Eficiencia Actual:</span>
+              <span>${printData.eficienciaActual}</span>
+        </div>
+            <div class="row">
+              <span>Eficiencia Promedio:</span>
+              <span>${printData.eficienciaPromedioHistorica} m³/kWh</span>
+        </div>
+        </div>
+          <div class="line"></div>
+          <div class="section">
+            <div class="bold">OBSERVACIONES:</div>
+            <div>${printData.observaciones}</div>
+        </div>
+          <div class="center small">Gracias por su registro</div>
+        </div>
+      </body>
+    </html>`;
+
+    await printHTML(html);
+  };
+
+  // Función común para imprimir HTML
+  const printHTML = async (html: string) => {
+    if (Platform.OS === "web") {
+      // En web, usar window.print()
+      const printWindow = window.open('', '_blank');
+      printWindow?.document.write(html);
+      printWindow?.document.close();
+      printWindow?.focus();
+      printWindow?.print();
+      printWindow?.close();
+    } else {
+      // En móvil, usar expo-print y expo-sharing
+      const { uri } = await Print.printToFileAsync({ html, width: 380, height: 900, base64: false });
+      if (Platform.OS === "ios") {
+        await Sharing.shareAsync(uri);
+      } else {
+        const pdfName = `ticket_${pozoId}_${Date.now()}.pdf`;
+        const newUri = `${FileSystem.documentDirectory}${pdfName}`;
+        await FileSystem.moveAsync({ from: uri, to: newUri });
+        await Sharing.shareAsync(newUri);
+      }
+    }
+
+    dispatch(showSnackbar({
+        message: "Ticket listo para imprimir",
+        type: "success",
+        duration: 3000,
+    }));
   };
 
   // Renderizado condicional
@@ -820,6 +970,118 @@ export default function TicketScreen() {
         </View>
       )}
     </View>
+    );
+  }
+
+  // Renderizado para datos de lectura desde parámetros
+  if (hasLecturaData) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#000" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Ticket de Lectura</Text>
+        </View>
+        
+        <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+          <View style={styles.ticketContainer}>
+            <View style={styles.ticketHeader}>
+              <Text style={styles.ticketNumber}>051</Text>
+              <Text style={styles.ticketTitle}>ASOCIACION DE USUARIOS DEL DISTRITO DE RIEGO NUMERO 051 COSTA DE HERMOSILLO, A.C.</Text>
+              <Text style={styles.ticketCode}>Código del Ticket: {lecturaFromParams.ticketNumero || 'N/A'}</Text>
+            </View>
+            
+            {/* Info principal */}
+            <View style={styles.infoRow}>
+              <View style={styles.infoItem}>
+                <Text style={styles.infoLabel}>Batería:</Text>
+                <Text style={styles.infoValue}>{mostrarValor(lecturaFromParams.bateria)}</Text>
+              </View>
+              <View style={styles.infoItem}>
+                <Text style={styles.infoLabel}>Pozo:</Text>
+                <Text style={styles.infoValue}>{mostrarValor(lecturaFromParams.pozoNombre)}</Text>
+              </View>
+            </View>
+            <View style={styles.infoRow}>
+              <View style={styles.infoItem}>
+                <Text style={styles.infoLabel}>Predio:</Text>
+                <Text style={styles.infoValue}>{mostrarValor(lecturaFromParams.pozoUbicacion)}</Text>
+              </View>
+            </View>
+            <View style={styles.infoRow}>
+              <View style={styles.infoItem}>
+                <Text style={styles.infoLabel}>Fecha:</Text>
+                <Text style={styles.infoValue}>{mostrarValor(fecha)}</Text>
+              </View>
+              <View style={styles.infoItem}>
+                <Text style={styles.infoLabel}>Hora:</Text>
+                <Text style={styles.infoValue}>{hora}</Text>
+              </View>
+            </View>
+            <Text style={styles.separator}>-----</Text>
+            
+            {/* Lecturas */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Lecturas del Mes</Text>
+              <View style={styles.readingContainer}>
+                <Text style={styles.readingTitle}>Medidor Volumétrico</Text>
+                <View style={styles.readingRow}>
+                  <Text style={styles.readingLabel}>Lectura Actual (m³):</Text>
+                  <Text style={styles.readingValue}>{mostrarLectura(lecturaFromParams.volumen)}</Text>
+                </View>
+                <View style={styles.readingRow}>
+                  <Text style={styles.readingLabel}>Gasto (l/s):</Text>
+                  <Text style={styles.readingValue}>{mostrarLectura(lecturaFromParams.gasto)}</Text>
+                </View>
+              </View>
+              
+              <Text style={styles.readingTitle}>Medidor Eléctrico</Text>
+              <View style={styles.readingRow}>
+                <Text style={styles.readingLabel}>Lectura Actual (kWh):</Text>
+                <Text style={styles.readingValue}>{mostrarLectura(lecturaFromParams.lecturaElectrica)}</Text>
+              </View>
+            </View>
+            
+            <Text style={styles.separator}>-----</Text>
+            
+            {/* Usuario */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Información del Usuario</Text>
+              <View style={styles.readingRow}>
+                <Text style={styles.readingLabel}>Usuario:</Text>
+                <Text style={styles.readingValue}>{mostrarValor(lecturaFromParams.usuario)}</Text>
+              </View>
+            </View>
+            
+            <Text style={styles.separator}>-----</Text>
+            
+            {/* Observaciones */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Observaciones</Text>
+              <Text style={styles.observationText}>{mostrarValor(lecturaFromParams.observaciones, "Sin observaciones")}</Text>
+            </View>
+          </View>
+        </ScrollView>
+
+        <View style={styles.actionButtons}>
+          <TouchableOpacity style={styles.actionButton} onPress={handlePrint}>
+            <Ionicons name="print-outline" size={24} color="white" />
+            <Text style={styles.printButtonText}>Imprimir PDF</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#28a745' }]} onPress={handlePrint}>
+            <Ionicons name="save-outline" size={24} color="white" />
+            <Text style={styles.printButtonText}>Guardar</Text>
+          </TouchableOpacity>
+        </View>
+
+        {isLoading && (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator size="large" color="#00A86B" />
+            <Text style={styles.loadingText}>Procesando...</Text>
+          </View>
+        )}
+      </View>
     );
   }
 

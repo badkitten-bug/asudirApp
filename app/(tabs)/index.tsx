@@ -81,10 +81,6 @@ export default function ControlPanel() {
     }
   }
 
-  const handleViewReceipts = () => {
-    router.push("/(tabs)/carpeta-recibos")
-  }
-
   return (
     <View style={styles.container}>
       {/* Configuración del StatusBar nativo */}

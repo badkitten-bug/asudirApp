@@ -23,6 +23,7 @@ import {
   selectIsLoadingPozos, 
   selectLastSyncDate, 
   syncPozos, 
+  clearPozos,
   type Pozo 
 } from "../../store/pozosSlice"
 
@@ -97,6 +98,39 @@ export default function SeleccionPozoScreen() {
     }
   }
 
+  // Función para limpiar cache y forzar sincronización
+  const handleClearCache = async () => {
+    if (isSyncing) return
+    
+    setIsSyncing(true)
+    try {
+      // Limpiar cache
+      dispatch(clearPozos())
+      
+      // Forzar nueva sincronización
+      await dispatch(syncPozos()).unwrap()
+      
+      dispatch(
+        showSnackbar({
+          message: "Cache limpiado y pozos sincronizados",
+          type: "success",
+          duration: 3000,
+        })
+      )
+    } catch (error) {
+      console.error("Error al limpiar cache:", error)
+      dispatch(
+        showSnackbar({
+          message: "Error al limpiar cache",
+          type: "error",
+          duration: 3000,
+        })
+      )
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
   // Función para manejar la selección de un pozo
   const handleSelectPozo = (pozo: Pozo) => {
     dispatch(
@@ -106,11 +140,11 @@ export default function SeleccionPozoScreen() {
         duration: 2000,
       })
     )
-    // Navegar usando el id numérico
+    // Navegar usando el documentId
     router.push({
       pathname: "/(tabs)/nueva-captura",
       params: {
-        pozoId: pozo.id,
+        pozoId: pozo.documentId,
         pozoNombre: pozo.nombre,
         pozoUbicacion: pozo.predio,
       },
@@ -183,13 +217,22 @@ export default function SeleccionPozoScreen() {
           <Text style={styles.title}>Seleccione un Pozo</Text>
           <Text style={styles.subtitle}>Elija el pozo para el cual desea capturar lecturas</Text>
         </View>
-        <TouchableOpacity style={styles.syncButton} onPress={handleSyncPozos} disabled={isSyncing}>
-          {isSyncing ? (
-            <ActivityIndicator size="small" color="#00A86B" />
-          ) : (
-            <Ionicons name="sync" size={24} color="#00A86B" />
-          )}
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity style={styles.syncButton} onPress={handleClearCache} disabled={isSyncing}>
+            {isSyncing ? (
+              <ActivityIndicator size="small" color="#e74c3c" />
+            ) : (
+              <Ionicons name="refresh" size={20} color="#e74c3c" />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.syncButton} onPress={handleSyncPozos} disabled={isSyncing}>
+            {isSyncing ? (
+              <ActivityIndicator size="small" color="#00A86B" />
+            ) : (
+              <Ionicons name="sync" size={20} color="#00A86B" />
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Información de sincronización */}
@@ -288,6 +331,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
     marginTop: 4,
+  },
+  headerButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   syncButton: {
     padding: 8,

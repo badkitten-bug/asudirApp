@@ -79,10 +79,6 @@ export default function ControlPanel() {
     }
   }
 
-  const handleViewReceipts = () => {
-    router.push("/(tabs)/carpeta-recibos")
-  }
-
   return (
     <View style={styles.container}>
       {/* Configuración del StatusBar nativo */}
@@ -132,15 +128,6 @@ export default function ControlPanel() {
             {pendingTickets.length > 0 ? `${pendingTickets.length} pendientes` : "Actualizado"}
           </Text>
           <Text style={styles.cardSubtitle}>{pozos.length} pozos disponibles</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.card} onPress={handleViewReceipts}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Carpeta de Recibos</Text>
-            <Ionicons name="folder-outline" size={24} color="#000" />
-          </View>
-          <Text style={[styles.cardValue, styles.recentValue]}>Ver Recibos</Text>
-          <Text style={styles.cardSubtitle}>Accede a todos tus recibos guardados</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>

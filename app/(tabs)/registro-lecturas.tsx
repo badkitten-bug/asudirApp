@@ -56,6 +56,7 @@ interface LecturaData {
   ticketNumero: string;
   ticketId: string | null;
   pozoId?: string; // ID del pozo para filtros
+  lecturaId: string; // Agregar el ID de la lectura
 }
 
 export default function RegistroLecturasScreen() {
@@ -102,6 +103,7 @@ export default function RegistroLecturasScreen() {
           ticketNumero: l.ticket?.numeroTicket ?? 'No disponible',
           ticketId: l.ticket?.documentId ?? null,
           pozoId: l.pozo?.id,
+          lecturaId: l.id,
         }))
         setLecturas(lecturasMapped)
       } catch (e) {
@@ -179,16 +181,72 @@ export default function RegistroLecturasScreen() {
     setSearchQuery("")
   }
 
+  // Función para actualizar las lecturas desde el backend
+  const handleRefreshLecturas = async () => {
+    if (!user || !user.token) return;
+    setIsLoading(true)
+    try {
+      const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/lectura-pozos?populate[ticket]=true&populate[pozo]=true&populate[usuario_pozo]=true&populate[ciclo]=true`, {
+        headers: { 'Authorization': `Bearer ${user.token}` }
+      })
+      const data = await res.json()
+      // Mapear cada lectura a un objeto para la UI
+      const lecturasMapped = (data.data ?? []).map((l: any) => ({
+        fecha: l.fecha ? l.fecha.split('T')[0] : 'No disponible',
+        pozoNombre: l.pozo?.numeropozo ?? 'No disponible',
+        pozoUbicacion: l.pozo?.predio ?? 'No disponible',
+        bateria: l.pozo?.bateria?.nombrebateria ?? 'No disponible',
+        usuario: l.usuario_pozo?.nombre ?? 'No disponible',
+        volumen: l.volumen ?? 'No disponible',
+        gasto: l.gasto ?? 'No disponible',
+        lecturaElectrica: l.lectura_electrica ?? 'No disponible',
+        observaciones: l.observaciones ?? 'Sin observaciones',
+        ticketNumero: l.ticket?.numeroTicket ?? 'No disponible',
+        ticketId: l.ticket?.documentId ?? null,
+        pozoId: l.pozo?.id,
+        lecturaId: l.id,
+      }))
+      setLecturas(lecturasMapped)
+      dispatch(showSnackbar({ 
+        message: 'Lecturas actualizadas correctamente', 
+        type: 'success', 
+        duration: 2000 
+      }))
+    } catch (e) {
+      dispatch(showSnackbar({ 
+        message: 'Error al actualizar las lecturas', 
+        type: 'error', 
+        duration: 3000 
+      }))
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   // Renderizar cada item de la lista
   const renderLecturaItem = ({ item }: { item: any }) => (
     <TouchableOpacity
       style={styles.ticketItem}
       onPress={() => {
-        if (item.ticketId) {
-          router.push({ pathname: "/ticket", params: { ticketDocumentId: item.ticketId } });
-        } else {
-          dispatch(showSnackbar({ message: "Este registro no tiene ticket generado.", type: "warning", duration: 2000 }));
-        }
+        // Navegar al ticket pasando todos los datos de la lectura
+        router.push({ 
+          pathname: "/(tabs)/ticket", 
+          params: { 
+            lecturaId: item.lecturaId || null,
+            pozoId: item.pozoId || '',
+            pozoNombre: item.pozoNombre || '',
+            pozoUbicacion: item.pozoUbicacion || '',
+            volumen: item.volumen || '',
+            gasto: item.gasto || '',
+            lecturaElectrica: item.lecturaElectrica || '',
+            observaciones: item.observaciones || '',
+            fecha: item.fecha || '',
+            bateria: item.bateria || '',
+            usuario: item.usuario || '',
+            ticketNumero: item.ticketNumero || '',
+            ticketId: item.ticketId || null,
+          } 
+        });
       }}
     >
       <View style={styles.ticketHeader}>
@@ -256,6 +314,9 @@ export default function RegistroLecturasScreen() {
         <Text style={styles.headerTitle}>Registro de Lecturas</Text>
         <TouchableOpacity style={styles.filterButton} onPress={() => setShowFilters(true)}>
           <Ionicons name="options-outline" size={24} color="#00A86B" />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.refreshButton} onPress={handleRefreshLecturas}>
+          <Ionicons name="refresh" size={24} color="#00A86B" />
         </TouchableOpacity>
       </View>
 
@@ -511,6 +572,9 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   filterButton: {
+    padding: 4,
+  },
+  refreshButton: {
     padding: 4,
   },
   searchContainer: {

@@ -13,6 +13,7 @@ import {
   StatusBar as RNStatusBar,
   Image,
   Modal,
+  Alert,
 } from "react-native"
 import { StatusBar } from "expo-status-bar"
 import { Ionicons } from "@expo/vector-icons"
@@ -61,6 +62,7 @@ const DISTANCIA_OPTIONS = [
   { label: "Más de 50m", value: "mas_50m" },
 ]
 
+// ANOMALIAS ACTUALIZADAS PARA MEDIDOR VOLUMÉTRICO
 const ANOMALIAS_VOLUMETRICO = [
   'Medidor Apagado',
   'Sin medidor',
@@ -68,14 +70,21 @@ const ANOMALIAS_VOLUMETRICO = [
   'Sin Acceso',
   'Lectura ilegible',
   'Cambio de Medidor',
+  'Holograma violado',
+  'Holograma despegado',
+  'Pozo desequipado',
+  'Pozo mantenimiento',
   'Otro',
 ];
+
+// ANOMALIAS ACTUALIZADAS PARA MEDIDOR ELÉCTRICO
 const ANOMALIAS_ELECTRICO = [
   'Medidor Apagado',
   'Sin medidor',
   'Sin Acceso',
   'Lectura ilegible',
   'Cambio de Medidor',
+  'Medidor descompuesto',
   'Otro',
 ];
 
@@ -120,6 +129,55 @@ export default function NuevaCapturaScreen() {
   // Estado para mostrar el modal de previsualización
   const [showPreview, setShowPreview] = useState(false)
 
+  // Función para validar lectura volumétrica (solo enteros)
+  const handleLecturaVolumenChange = (text: string) => {
+    // Solo permitir números enteros
+    const numericValue = text.replace(/[^0-9]/g, '')
+    setLecturaVolumen(numericValue)
+  }
+
+  // Función para validar gasto (no más de 200)
+  const handleGastoChange = (text: string) => {
+    const numericValue = text.replace(/[^0-9]/g, '')
+    const value = parseInt(numericValue) || 0
+    if (value <= 200) {
+      setGasto(numericValue)
+    } else {
+      dispatch(showSnackbar({
+        message: "El gasto no puede ser mayor a 200 l/s",
+        type: "warning",
+        duration: 3000,
+      }))
+    }
+  }
+
+  // Función para validar lectura eléctrica (solo enteros)
+  const handleLecturaElectricaChange = (text: string) => {
+    const numericValue = text.replace(/[^0-9]/g, '')
+    setLecturaElectrica(numericValue)
+  }
+
+  // Función para validar que se tomen las 2 fotos obligatorias
+  const validatePhotos = () => {
+    if (!photoUri) {
+      dispatch(showSnackbar({
+        message: "Es obligatorio tomar foto del medidor volumétrico",
+        type: "warning",
+        duration: 3000,
+      }))
+      return false
+    }
+    if (!photoUriElec) {
+      dispatch(showSnackbar({
+        message: "Es obligatorio tomar foto del medidor eléctrico",
+        type: "warning",
+        duration: 3000,
+      }))
+      return false
+    }
+    return true
+  }
+
   // Función para volver al Panel de Control
   const handleBack = () => {
     router.back()
@@ -162,7 +220,7 @@ export default function NuevaCapturaScreen() {
     setShowCamera(false)
     dispatch(
       showSnackbar({
-        message: "Foto guardada correctamente",
+        message: "Foto del medidor volumétrico guardada correctamente",
         type: "success",
         duration: 2000,
       }),
@@ -207,7 +265,46 @@ export default function NuevaCapturaScreen() {
   }
 
   const handleGenerateTicket = () => {
-    setShowPreview(true)
+    // Validar que se tomen las 2 fotos obligatorias
+    if (!validatePhotos()) {
+      return
+    }
+
+    // Validar que se ingrese lectura volumétrica
+    if (!lecturaVolumen.trim() || parseInt(lecturaVolumen) === 0) {
+      dispatch(showSnackbar({
+        message: "Por favor ingresa la lectura volumétrica",
+        type: "warning",
+        duration: 3000,
+      }))
+      return
+    }
+
+    // Validar que se ingrese lectura eléctrica
+    if (!lecturaElectrica.trim() || parseInt(lecturaElectrica) === 0) {
+      dispatch(showSnackbar({
+        message: "Por favor ingresa la lectura eléctrica",
+        type: "warning",
+        duration: 3000,
+      }))
+      return
+    }
+
+    // Mostrar confirmación antes de generar el ticket
+    Alert.alert(
+      "Confirmar Lectura",
+      "¿Estás seguro de que todos los datos son correctos?",
+      [
+        {
+          text: "Revisar",
+          style: "cancel"
+        },
+        {
+          text: "Confirmar",
+          onPress: () => setShowPreview(true)
+        }
+      ]
+    )
   }
 
   const handleConfirmar = async () => {
@@ -216,8 +313,8 @@ export default function NuevaCapturaScreen() {
         dispatch(showSnackbar({ message: 'No autenticado', type: 'error', duration: 3000 }))
         return
       }
-      if (!pozoInfo || !pozoInfo.id || !pozoInfo.usuario_pozo?.id || !pozoInfo.ciclo_agricola?.id) {
-        dispatch(showSnackbar({ message: 'No se pudo obtener pozo, usuario_pozo o ciclo', type: 'error', duration: 3000 }))
+      if (!pozoInfo || !pozoInfo.id || !pozoInfo.usuario_pozos?.[0]?.id) {
+        dispatch(showSnackbar({ message: 'No se pudo obtener pozo o usuario_pozos', type: 'error', duration: 3000 }))
         return
       }
 
@@ -230,58 +327,20 @@ export default function NuevaCapturaScreen() {
         lecturaVolumen,
         gasto,
         lecturaElectrica,
+        cargaMotor: lecturaElectrica, // Usar lectura eléctrica como carga del motor
+        gastoPozo: gasto, // Usar gasto como gasto del pozo
         observaciones,
-        anomaliasVol,
-        anomaliasElec,
         fecha: new Date().toISOString().split("T")[0],
         hora: new Date().toTimeString().split(" ")[0],
         estado: "pendiente" as const,
-        photoVolumen: photoUri,
-        photoElectrica: photoUriElec,
-        capturador: user.name,
-        timestamp: new Date().toISOString(),
+        photoVolumen: photoUri || undefined,
+        photoElectrica: photoUriElec || undefined,
       }
 
       // Guardar ticket local en el store
       dispatch(addTicket(ticketLocal))
 
-      // 2. ENVIAR AL BACKEND
-      // Subir foto volumétrica si existe
-      let idFotoVol = null
-      if (photoUri) {
-        const formData: any = new FormData()
-        formData.append('files', {
-          uri: photoUri,
-          name: 'foto_volumetrico.jpg',
-          type: 'image/jpeg',
-        } as any)
-        const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/upload`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${user.token}` },
-          body: formData
-        })
-        const data = await res.json()
-        idFotoVol = data[0]?.id
-      }
-      
-      // Subir foto eléctrica si existe
-      let idFotoElec = null
-      if (photoUriElec) {
-        const formData: any = new FormData()
-        formData.append('files', {
-          uri: photoUriElec,
-          name: 'foto_electrico.jpg',
-          type: 'image/jpeg',
-        } as any)
-        const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/upload`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${user.token}` },
-          body: formData
-        })
-        const data = await res.json()
-        idFotoElec = data[0]?.id
-      }
-      
+      // 2. ENVIAR AL BACKEND (SIN SUBIR ARCHIVOS)
       // Armar el payload para el backend
       const payload: any = {
         data: {
@@ -291,18 +350,23 @@ export default function NuevaCapturaScreen() {
           lectura_electrica: Number(lecturaElectrica),
           observaciones,
           pozo: pozoInfo.id,
-          usuario_pozo: pozoInfo.usuario_pozo.id,
-          ciclo: pozoInfo.ciclo_agricola.id,
+          usuario_pozo: pozoInfo.usuario_pozos[0].id,
+          capturador: user.id,
           estado: "pendiente",
-          ticket_id: ticketLocal.id, // Referencia al ticket local
         }
+      }
+      
+      // Solo agregar ciclo si existe
+      if (pozoInfo.ciclo_agricola?.id) {
+        payload.data.ciclo = pozoInfo.ciclo_agricola.id
       }
       
       // Solo agregar anomalías si hay alguna seleccionada
       if (mostrarAnomaliasVol && anomaliasVol.length > 0) {
         const anomaliasVolValidas = anomaliasVol.filter(anomalia => 
           ["Medidor Apagado", "Sin medidor", "Pozo encendido, medidor no marca gasto", 
-           "Sin Acceso", "Lectura ilegible", "Cambio de Medidor", "Otro"].includes(anomalia)
+           "Sin Acceso", "Lectura ilegible", "Cambio de Medidor", "Holograma violado",
+           "Holograma despegado", "Pozo desequipado", "Pozo mantenimiento", "Otro"].includes(anomalia)
         )
         if (anomaliasVolValidas.length > 0) {
           payload.data.anomalias_volumetrico = anomaliasVolValidas
@@ -314,7 +378,7 @@ export default function NuevaCapturaScreen() {
       if (mostrarAnomaliasElec && anomaliasElec.length > 0) {
         const anomaliasElecValidas = anomaliasElec.filter(anomalia => 
           ["Medidor Apagado", "Sin medidor", "Sin Acceso", 
-           "Lectura ilegible", "Cambio de Medidor", "Otro"].includes(anomalia)
+           "Lectura ilegible", "Cambio de Medidor", "Medidor descompuesto", "Otro"].includes(anomalia)
         )
         if (anomaliasElecValidas.length > 0) {
           payload.data.anomalias_electrico = anomaliasElecValidas
@@ -322,9 +386,6 @@ export default function NuevaCapturaScreen() {
           if (cambioSerieElec) payload.data.detalle_cambio_medidor_electrico = cambioSerieElec
         }
       }
-      
-      if (idFotoVol) (payload.data as any)["foto_volumetrico"] = idFotoVol
-      if (idFotoElec) (payload.data as any)["foto_electrico"] = idFotoElec
       
       // POST a lectura-pozos
       const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/lectura-pozos`, {
@@ -381,18 +442,47 @@ export default function NuevaCapturaScreen() {
     const fetchPozo = async () => {
       setLoadingPozo(true)
       try {
-        // Usar id numérico en el endpoint y enviar el token en el header
-        const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/pozos/${pozoId}?populate[usuario_pozo]=true&populate[ciclo_agricola]=true`, {
+        console.log('🔍 Fetching pozo with ID:', pozoId)
+        console.log('🔍 API URL:', process.env.EXPO_PUBLIC_API_URL)
+        console.log('🔍 User token:', user?.token ? 'Present' : 'Missing')
+        
+        // Usar documentId en el endpoint y enviar el token en el header
+        const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/pozos/${pozoId}?populate[usuario_pozos]=true&populate[ciclo_agricola]=true`, {
           headers: {
             'Authorization': `Bearer ${user?.token}`,
             'Content-Type': 'application/json',
           }
         })
+        
+        console.log('🔍 Response status:', res.status)
+        
+        if (!res.ok) {
+          console.error('❌ Error response:', res.status, res.statusText)
+          const errorText = await res.text()
+          console.error('❌ Error body:', errorText)
+          throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+        }
+        
         const data = await res.json()
+        console.log('✅ Pozo data received:', JSON.stringify(data, null, 2))
+        
         setPozoInfo(data.data)
-        setUsuarioPozoId(data.data?.usuario_pozo?.id ?? null)
+        // usuario_pozos es un array, tomar el primer usuario
+        const primerUsuario = data.data?.usuario_pozos?.[0] ?? null
+        setUsuarioPozoId(primerUsuario?.id ?? null)
         setCicloId(data.data?.ciclo_agricola?.id ?? null)
+        
+        console.log('✅ Pozo info set:', {
+          id: data.data?.id,
+          numeropozo: data.data?.numeropozo,
+          predio: data.data?.predio,
+          usuario_pozos_count: data.data?.usuario_pozos?.length ?? 0,
+          primer_usuario_id: primerUsuario?.id,
+          ciclo_id: data.data?.ciclo_agricola?.id
+        })
+        
       } catch (e) {
+        console.error('❌ Error fetching pozo:', e)
         setPozoInfo(null)
         setUsuarioPozoId(null)
         setCicloId(null)
@@ -400,8 +490,12 @@ export default function NuevaCapturaScreen() {
         setLoadingPozo(false)
       }
     }
-    if (pozoId) fetchPozo()
-  }, [pozoId])
+    if (pozoId && user?.token) {
+      fetchPozo()
+    } else {
+      console.log('⚠️ Missing pozoId or user token:', { pozoId, hasToken: !!user?.token })
+    }
+  }, [pozoId, user?.token])
 
   useEffect(() => {
     // Limpiar todos los campos del formulario al cambiar de pozo
@@ -484,23 +578,25 @@ export default function NuevaCapturaScreen() {
             {/* Medidor Volumétrico */}
             <View style={styles.sectionContainer}>
               <Text style={[styles.sectionTitle, { color: '#00A86B' }]}>Medidor Volumétrico</Text>
-              <Text style={styles.inputLabel}>Lectura Volumétrica (m³)</Text>
+              <Text style={styles.inputLabel}>Lectura Volumétrica (m³) *</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Ingrese lectura volumétrica"
+                placeholder="Ingrese lectura volumétrica (solo números enteros)"
                 value={lecturaVolumen}
-                onChangeText={setLecturaVolumen}
+                onChangeText={handleLecturaVolumenChange}
                 keyboardType="numeric"
               />
-              <Text style={styles.inputLabel}>Gasto (l/s)</Text>
+              <Text style={styles.inputLabel}>Gasto (l/s) - Máximo 200 *</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Ingrese gasto volumétrico"
+                placeholder="Ingrese gasto volumétrico (máximo 200)"
                 value={gasto}
-                onChangeText={setGasto}
+                onChangeText={handleGastoChange}
                 keyboardType="numeric"
               />
 
+              {/* Foto obligatoria del medidor volumétrico */}
+              <Text style={[styles.inputLabel, { color: '#e74c3c', fontWeight: 'bold' }]}>Foto del Medidor Volumétrico *</Text>
               {photoUri ? (
                 <View style={styles.photoPreviewContainer}>
                   <Image source={{ uri: photoUri }} style={styles.photoPreview} />
@@ -510,9 +606,9 @@ export default function NuevaCapturaScreen() {
                   </TouchableOpacity>
                 </View>
               ) : (
-                <TouchableOpacity style={styles.photoButton} onPress={handleOpenCamera}>
+                <TouchableOpacity style={[styles.photoButton, { backgroundColor: '#e74c3c' }]} onPress={handleOpenCamera}>
                   <Ionicons name="camera-outline" size={20} color="white" />
-                  <Text style={styles.photoButtonText}>Tomar Foto</Text>
+                  <Text style={styles.photoButtonText}>Tomar Foto (Obligatorio)</Text>
                 </TouchableOpacity>
               )}
 
@@ -545,15 +641,17 @@ export default function NuevaCapturaScreen() {
           {/* --- Sección Medidor Eléctrico --- */}
           <View style={styles.card}>
             <Text style={[styles.sectionTitle, { color: '#00A86B' }]}>Medidor Eléctrico</Text>
-            <Text style={styles.inputLabel}>Lectura Eléctrica (kWh)</Text>
+            <Text style={styles.inputLabel}>Lectura Eléctrica (kWh) *</Text>
             <TextInput
               style={styles.input}
-              placeholder="Ingrese la lectura eléctrica"
+              placeholder="Ingrese la lectura eléctrica (solo números enteros)"
               value={lecturaElectrica}
-              onChangeText={setLecturaElectrica}
+              onChangeText={handleLecturaElectricaChange}
               keyboardType="numeric"
             />
 
+            {/* Foto obligatoria del medidor eléctrico */}
+            <Text style={[styles.inputLabel, { color: '#e74c3c', fontWeight: 'bold' }]}>Foto del Medidor Eléctrico *</Text>
             {photoUriElec ? (
               <View style={styles.photoPreviewContainer}>
                 <Image source={{ uri: photoUriElec }} style={styles.photoPreview} />
@@ -563,9 +661,9 @@ export default function NuevaCapturaScreen() {
                 </TouchableOpacity>
               </View>
             ) : (
-              <TouchableOpacity style={styles.photoButton} onPress={handleOpenCameraElec}>
+              <TouchableOpacity style={[styles.photoButton, { backgroundColor: '#e74c3c' }]} onPress={handleOpenCameraElec}>
                 <Ionicons name="camera-outline" size={20} color="white" />
-                <Text style={styles.photoButtonText}>Tomar Foto</Text>
+                <Text style={styles.photoButtonText}>Tomar Foto (Obligatorio)</Text>
               </TouchableOpacity>
             )}
 
@@ -611,8 +709,19 @@ export default function NuevaCapturaScreen() {
             <TouchableOpacity style={[styles.button, { backgroundColor: '#eee' }]} onPress={handleBack}>
               <Text style={{ color: '#333' }}>Cancelar</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.button, { backgroundColor: '#00A86B' }]} onPress={handleGenerateTicket}>
-              <Text style={{ color: '#fff', fontWeight: 'bold' }}>Guardar Lectura</Text>
+            <TouchableOpacity 
+              style={[
+                styles.button, 
+                { 
+                  backgroundColor: photoUri && photoUriElec && lecturaVolumen && lecturaElectrica ? '#00A86B' : '#ccc'
+                }
+              ]} 
+              onPress={handleGenerateTicket}
+              disabled={!photoUri || !photoUriElec || !lecturaVolumen || !lecturaElectrica}
+            >
+              <Text style={{ color: '#fff', fontWeight: 'bold' }}>
+                {photoUri && photoUriElec && lecturaVolumen && lecturaElectrica ? 'Validar y Guardar' : 'Completar Datos'}
+              </Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
