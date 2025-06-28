@@ -24,7 +24,8 @@ import {
   selectLastSyncDate, 
   syncPozos, 
   clearPozos,
-  type Pozo 
+  type Pozo,
+  loadPozos,
 } from "../../store/pozosSlice"
 
 const STATUSBAR_HEIGHT = Constants.statusBarHeight || 0
@@ -48,6 +49,7 @@ export default function SeleccionPozoScreen() {
       setIsSyncing(true)
       try {
         await dispatch(syncPozos()).unwrap()
+        await dispatch(loadPozos()).unwrap()
       } catch (error) {
         dispatch(showSnackbar({
           message: "Error al sincronizar pozos",
@@ -77,6 +79,7 @@ export default function SeleccionPozoScreen() {
     setIsSyncing(true)
     try {
       await dispatch(syncPozos()).unwrap()
+      await dispatch(loadPozos()).unwrap()
       dispatch(
         showSnackbar({
           message: "Pozos sincronizados correctamente",
@@ -109,6 +112,7 @@ export default function SeleccionPozoScreen() {
       
       // Forzar nueva sincronización
       await dispatch(syncPozos()).unwrap()
+      await dispatch(loadPozos()).unwrap()
       
       dispatch(
         showSnackbar({
