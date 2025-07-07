@@ -19,7 +19,7 @@ import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import Constants from "expo-constants"
 import { useDispatch, useSelector } from "../../store"
-import { loadTickets, selectAllTickets, type Ticket as TicketBase } from "../../store/ticketsSlice"
+import { loadTickets, selectAllTickets, type Ticket as TicketBase, selectPendingTickets } from "../../store/ticketsSlice"
 import { selectAllPozos } from "../../store/pozosSlice"
 import { showSnackbar } from "../../store/snackbarSlice"
 
@@ -64,6 +64,7 @@ export default function RegistroLecturasScreen() {
   const dispatch = useDispatch()
   const pozos = useSelector(selectAllPozos)
   const user = useSelector((state: any) => state.auth.user)
+  const pendingTickets = useSelector(selectPendingTickets)
 
   // Estado para lecturas reales del backend
   const [lecturas, setLecturas] = useState<LecturaData[]>([])
@@ -169,6 +170,25 @@ export default function RegistroLecturasScreen() {
     )
   })
 
+  // Unificar lecturas del backend y pendientes locales
+  const lecturasPendientesUI = pendingTickets.map((t) => ({
+    fecha: t.fecha,
+    pozoNombre: t.pozoNombre,
+    pozoUbicacion: t.pozoUbicacion,
+    bateria: '',
+    usuario: '',
+    volumen: t.lecturaVolumen,
+    gasto: t.gastoPozo,
+    lecturaElectrica: t.lecturaElectrica,
+    observaciones: t.observaciones,
+    ticketNumero: t.id,
+    ticketId: null,
+    pozoId: t.pozoId,
+    lecturaId: t.id,
+    estado: 'pendiente',
+  }));
+  const todasLecturas = [...lecturasPendientesUI, ...filteredLecturas];
+
   // Función para limpiar todos los filtros
   const handleClearFilters = () => {
     setFiltroPozo("")
@@ -225,71 +245,12 @@ export default function RegistroLecturasScreen() {
 
   // Renderizar cada item de la lista
   const renderLecturaItem = ({ item }: { item: any }) => (
-    <TouchableOpacity
-      style={styles.ticketItem}
-      onPress={() => {
-        // Navegar al ticket pasando todos los datos de la lectura
-        router.push({ 
-          pathname: "/(tabs)/ticket", 
-          params: { 
-            lecturaId: item.lecturaId || null,
-            pozoId: item.pozoId || '',
-            pozoNombre: item.pozoNombre || '',
-            pozoUbicacion: item.pozoUbicacion || '',
-            volumen: item.volumen || '',
-            gasto: item.gasto || '',
-            lecturaElectrica: item.lecturaElectrica || '',
-            observaciones: item.observaciones || '',
-            fecha: item.fecha || '',
-            bateria: item.bateria || '',
-            usuario: item.usuario || '',
-            ticketNumero: item.ticketNumero || '',
-            ticketId: item.ticketId || null,
-          } 
-        });
-      }}
-    >
-      <View style={styles.ticketHeader}>
-        <View style={styles.ticketHeaderLeft}>
-          <Text style={styles.ticketId}>Ticket: {item.ticketNumero}</Text>
-          <Text style={styles.ticketFecha}>Fecha: {item.fecha}</Text>
-        </View>
-      </View>
-      <View style={styles.ticketContent}>
-        <View style={styles.ticketRow}>
-          <Text style={styles.ticketLabel}>Pozo:</Text>
-          <Text style={styles.ticketValue}>{item.pozoNombre || 'Sin dato'}</Text>
-        </View>
-        <View style={styles.ticketRow}>
-          <Text style={styles.ticketLabel}>Predio:</Text>
-          <Text style={styles.ticketValue}>{item.pozoUbicacion || 'Sin dato'}</Text>
-        </View>
-        <View style={styles.ticketRow}>
-          <Text style={styles.ticketLabel}>Batería:</Text>
-          <Text style={styles.ticketValue}>{item.bateria || 'Sin dato'}</Text>
-        </View>
-        <View style={styles.ticketRow}>
-          <Text style={styles.ticketLabel}>Usuario:</Text>
-          <Text style={styles.ticketValue}>{item.usuario || 'Sin dato'}</Text>
-        </View>
-        <View style={styles.ticketRow}>
-          <Text style={styles.ticketLabel}>Lectura Volumen:</Text>
-          <Text style={styles.ticketValue}>{item.volumen || 'Sin dato'}</Text>
-        </View>
-        <View style={styles.ticketRow}>
-          <Text style={styles.ticketLabel}>Gasto:</Text>
-          <Text style={styles.ticketValue}>{item.gasto || 'Sin dato'}</Text>
-        </View>
-        <View style={styles.ticketRow}>
-          <Text style={styles.ticketLabel}>Lectura Eléctrica:</Text>
-          <Text style={styles.ticketValue}>{item.lecturaElectrica || 'Sin dato'}</Text>
-        </View>
-        <View style={styles.ticketRow}>
-          <Text style={styles.ticketLabel}>Observaciones:</Text>
-          <Text style={styles.ticketValue}>{item.observaciones || 'Sin observaciones'}</Text>
-        </View>
-      </View>
-    </TouchableOpacity>
+    <View style={{ ...styles.lecturaItem, borderLeftColor: item.estado === 'pendiente' ? '#FFA500' : '#00A86B', borderLeftWidth: 4 }}>
+      <Text style={styles.lecturaTitle}>{item.pozoNombre} ({item.fecha})</Text>
+      <Text style={styles.lecturaSubtitle}>Volumen: {item.volumen} | Gasto: {item.gasto} | Eléctrica: {item.lecturaElectrica}</Text>
+      <Text style={styles.lecturaSubtitle}>Observaciones: {item.observaciones}</Text>
+      {item.estado === 'pendiente' && <Text style={{ color: '#FFA500', fontWeight: 'bold' }}>Pendiente de sincronizar</Text>}
+    </View>
   )
 
   // Renderizar mensaje cuando no hay resultados
@@ -339,7 +300,7 @@ export default function RegistroLecturasScreen() {
       {/* Indicadores de filtros activos */}
       {(filtroPozo || filtroBateria || filtroDia || filtroMes || filtroAno || filtroFechaInicio) && (
         <View style={styles.activeFiltersContainer}>
-          <Text style={styles.activeFiltersText}>Filtros activos: {filteredLecturas.length} resultados</Text>
+          <Text style={styles.activeFiltersText}>Filtros activos: {todasLecturas.length} resultados</Text>
           <TouchableOpacity onPress={handleClearFilters}>
             <Text style={styles.clearFiltersLink}>Limpiar</Text>
           </TouchableOpacity>
@@ -354,9 +315,9 @@ export default function RegistroLecturasScreen() {
         </View>
       ) : (
         <FlatList
-          data={filteredLecturas}
+          data={todasLecturas}
+          keyExtractor={(item) => item.lecturaId}
           renderItem={renderLecturaItem}
-          keyExtractor={(item) => item.ticketId ?? Math.random().toString()}
           ListEmptyComponent={renderEmptyList}
           contentContainerStyle={styles.listContent}
         />
@@ -831,6 +792,20 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "bold",
     fontSize: 14,
+  },
+  lecturaItem: {
+    padding: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#00A86B',
+  },
+  lecturaTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  lecturaSubtitle: {
+    fontSize: 12,
+    color: '#666',
   },
 })
 

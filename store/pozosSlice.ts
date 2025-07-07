@@ -78,10 +78,14 @@ export const syncPozos = createAsyncThunk("pozos/syncPozos", async (_, { getStat
       throw new Error("Usuario no autenticado");
     }
 
-    // Usar la variable de entorno para la URL del backend
-    const API_URL = process.env.EXPO_PUBLIC_API_URL;
+    // Construcción robusta de la URL
+    let baseUrl = process.env.EXPO_PUBLIC_API_URL || '';
+    if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
+    if (!baseUrl.endsWith('/api')) baseUrl = baseUrl + '/api';
+    const url = `${baseUrl}/pozos-capturador/${userId}`;
+    console.log('URL de syncPozos:', url);
 
-    const response = await fetch(`${API_URL}/pozos-capturador/${userId}`, {
+    const response = await fetch(url, {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { Modal, View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
 
 interface TicketPreviewModalProps {
   visible: boolean;
@@ -15,6 +15,8 @@ interface TicketPreviewModalProps {
     anomaliasVol: string[];
     anomaliasElec: string[];
     fecha: string;
+    photoUri?: string | null;
+    photoUriElec?: string | null;
     // Puedes agregar más campos si lo necesitas
   };
 }
@@ -42,6 +44,23 @@ const TicketPreviewModal: React.FC<TicketPreviewModalProps> = ({ visible, onClos
             <Text style={styles.value}>{ticketData.anomaliasElec.length > 0 ? ticketData.anomaliasElec.join(', ') : 'Ninguna'}</Text>
             <Text style={styles.label}>Observaciones:</Text>
             <Text style={styles.value}>{ticketData.observaciones || 'Sin observaciones'}</Text>
+            <Text style={styles.label}>Fotos de la lectura:</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', width: '100%', marginVertical: 8 }}>
+              {ticketData.photoUri ? (
+                <Image source={{ uri: ticketData.photoUri }} style={{ width: 100, height: 100, margin: 8, borderRadius: 8 }} resizeMode="cover" />
+              ) : (
+                <View style={{ width: 100, height: 100, margin: 8, borderRadius: 8, backgroundColor: '#eee', justifyContent: 'center', alignItems: 'center' }}>
+                  <Text style={{ color: 'gray', fontSize: 12, textAlign: 'center' }}>No hay foto volumétrica</Text>
+                </View>
+              )}
+              {ticketData.photoUriElec ? (
+                <Image source={{ uri: ticketData.photoUriElec }} style={{ width: 100, height: 100, margin: 8, borderRadius: 8 }} resizeMode="cover" />
+              ) : (
+                <View style={{ width: 100, height: 100, margin: 8, borderRadius: 8, backgroundColor: '#eee', justifyContent: 'center', alignItems: 'center' }}>
+                  <Text style={{ color: 'gray', fontSize: 12, textAlign: 'center' }}>No hay foto eléctrica</Text>
+                </View>
+              )}
+            </View>
             <View style={styles.buttonRow}>
               <TouchableOpacity style={[styles.button, { backgroundColor: '#eee' }]} onPress={onClose}>
                 <Text style={{ color: '#333' }}>Editar</Text>

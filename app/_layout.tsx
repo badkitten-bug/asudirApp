@@ -12,11 +12,27 @@ import { useDispatch, useSelector,store } from "../store"
 import { loadTickets } from "../store/ticketsSlice"
 import { loadSignedTickets } from "../store/signedTicketsSlice"
 import { loadPozos } from "../store/pozosSlice"
+import NetInfo from '@react-native-community/netinfo';
+import { syncTickets } from '../store/ticketsSlice';
+
+function useAutoSyncTickets() {
+  const dispatch = useDispatch();
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      if (state.isConnected) {
+        dispatch(syncTickets());
+      }
+    });
+    return () => unsubscribe();
+  }, [dispatch]);
+}
 
 // Agregar la carga de tickets al iniciar la app
 function AuthWrapper() {
   const dispatch = useDispatch()
   const { isAuthenticated, isLoading } = useSelector((state:any) => state.auth)
+
+  useAutoSyncTickets();
 
   useEffect(() => {
     // Cargar usuario y tickets al iniciar la app

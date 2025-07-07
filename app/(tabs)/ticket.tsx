@@ -388,7 +388,7 @@ export default function TicketScreen() {
       setLoadingTicket(true);
       try {
         const res = await fetch(
-          `${process.env.EXPO_PUBLIC_API_URL}/tickets/${ticketDocumentId}?populate[lectura]=true&populate[pozo]=true`,
+          `${process.env.EXPO_PUBLIC_API_URL}/api/tickets/${ticketDocumentId}?populate[lectura]=true&populate[pozo]=true`,
           {
             headers: { 'Authorization': `Bearer ${user.token}` }
           }

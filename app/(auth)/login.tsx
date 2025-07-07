@@ -126,6 +126,7 @@ export default function LoginScreen() {
 
       // Validar credenciales usando el thunk
       const login = await dispatch(validateCredentials({ email, password })).unwrap()
+      console.log("Respuesta del backend:", login)
 
       // Mostrar mensaje de éxito
       if(login){
@@ -154,11 +155,25 @@ export default function LoginScreen() {
       }, 500)
     } catch (error) {
       console.error("Error en el proceso de login:", error)
+      // Mostrar el mensaje real del backend si existe
+      let mensaje = "Email o contraseña incorrectos"
+      if (error && typeof error === 'object') {
+        const err = error as any;
+        if ('message' in err && typeof err.message === 'string') {
+          mensaje = err.message;
+        }
+        if ('response' in err && err.response && typeof err.response === 'object') {
+          const response = err.response;
+          if (response.data && response.data.error && response.data.error.message) {
+            mensaje = response.data.error.message || mensaje;
+          }
+        }
+      }
       dispatch(
         showSnackbar({
-          message: "Email o contraseña incorrectos",
+          message: mensaje,
           type: "error",
-          duration: 3000,
+          duration: 4000,
         }),
       )
     }
@@ -251,7 +266,7 @@ export default function LoginScreen() {
                 <Text style={styles.title}>Iniciar Sesión</Text>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Email</Text>
+                  <Text style={styles.label}>Correo</Text>
                   <TextInput
                     style={styles.input}
                     placeholder="Ingresa tu Email aquí"

@@ -16,8 +16,11 @@ export interface Ticket {
   fecha: string
   hora: string
   estado: "pendiente" | "sincronizado"
-  photoVolumen?: string
-  photoElectrica?: string
+  photoVolumenUri?: string // URI local
+  photoElectricaUri?: string // URI local
+  idRemoto?: string // ID en Strapi
+  fotoVolumenSubida?: boolean
+  fotoElectricaSubida?: boolean
 }
 
 interface TicketsState {
@@ -95,19 +98,98 @@ export const addTicket = createAsyncThunk("tickets/addTicket", async (ticket: Ti
 
 // Thunk para sincronizar tickets (simulado)
 export const syncTickets = createAsyncThunk("tickets/syncTickets", async (_, { getState, dispatch }) => {
-  try {
-    const state = getState() as { tickets: TicketsState }
-    // Simulamos que todos los tickets pendientes se sincronizan
-    const updatedTickets = state.tickets.tickets.map((ticket) => ({
-      ...ticket,
-      estado: "sincronizado" as const,
-    }))
-    await dispatch(saveTickets(updatedTickets))
-    return updatedTickets
-  } catch (error) {
-    console.error("Error syncing tickets:", error)
-    throw error
+  const state = getState() as { tickets: TicketsState }
+  const updatedTickets: Ticket[] = []
+  for (const ticket of state.tickets.tickets) {
+    if (ticket.estado === "sincronizado") {
+      updatedTickets.push(ticket)
+      continue
+    }
+    let idRemoto = ticket.idRemoto
+    // 1. Subir la lectura si no tiene idRemoto
+    if (!idRemoto) {
+      try {
+        // Aquí debes llamar a tu función crearLecturaPozo y obtener el id remoto
+        const lecturaData = await crearLecturaPozo({
+          apiUrl: process.env.EXPO_PUBLIC_API_URL,
+          token: ticket.token, // Asegúrate de guardar el token necesario
+          data: {
+            fecha: ticket.fecha,
+            lectura_volumetrica: ticket.lecturaVolumen,
+            gasto: ticket.gastoPozo,
+            lectura_electrica: ticket.lecturaElectrica,
+            observaciones: ticket.observaciones,
+            pozo: ticket.pozoId,
+            capturador: ticket.capturadorId, // Asegúrate de guardar el id del capturador
+            estado: "pendiente"
+          }
+        })
+        idRemoto = lecturaData.data?.id
+        if (!idRemoto) throw new Error('No se obtuvo el ID remoto de la lectura')
+        ticket.idRemoto = idRemoto
+      } catch (err) {
+        // Si falla, mantener como pendiente
+        updatedTickets.push(ticket)
+        continue
+      }
+    }
+    // 2. Subir foto volumétrica si no está subida
+    if (ticket.photoVolumenUri && !ticket.fotoVolumenSubida) {
+      try {
+        await uploadFoto({
+          apiUrl: process.env.EXPO_PUBLIC_API_URL,
+          token: ticket.token,
+          uri: ticket.photoVolumenUri,
+          field: 'foto_volumetrico',
+          lecturaId: idRemoto,
+          filename: 'foto_volumetrico.jpg'
+        })
+        ticket.fotoVolumenSubida = true
+      } catch (err) {
+        updatedTickets.push(ticket)
+        continue
+      }
+    }
+    // 3. Subir foto eléctrica si no está subida
+    if (ticket.photoElectricaUri && !ticket.fotoElectricaSubida) {
+      try {
+        await uploadFoto({
+          apiUrl: process.env.EXPO_PUBLIC_API_URL,
+          token: ticket.token,
+          uri: ticket.photoElectricaUri,
+          field: 'foto_electrico',
+          lecturaId: idRemoto,
+          filename: 'foto_electrico.jpg'
+        })
+        ticket.fotoElectricaSubida = true
+      } catch (err) {
+        updatedTickets.push(ticket)
+        continue
+      }
+    }
+    // 4. Validar con un GET que las fotos estén asociadas
+    try {
+      const url = `${process.env.EXPO_PUBLIC_API_URL}/lectura-pozos/${idRemoto}?populate=*`
+      const res = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${ticket.token}` }
+      })
+      const data = await res.json()
+      const tieneFotoVol = !!data?.data?.attributes?.foto_volumetrico?.data?.id
+      const tieneFotoElec = !!data?.data?.attributes?.foto_electrico?.data?.id
+      if (tieneFotoVol && tieneFotoElec) {
+        ticket.estado = "sincronizado"
+      } else {
+        updatedTickets.push(ticket)
+        continue
+      }
+    } catch (err) {
+      updatedTickets.push(ticket)
+      continue
+    }
+    updatedTickets.push(ticket)
   }
+  await dispatch(saveTickets(updatedTickets))
+  return updatedTickets
 })
 
 const ticketsSlice = createSlice({

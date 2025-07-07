@@ -9,17 +9,20 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "test": "jest --watchAll",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "emulator": "C:\\Users\\seghs\\AppData\\Local\\Android\\Sdk\\emulator\\emulator.exe -avd Medium_Phone_API_35"
   },
   "jest": {
     "preset": "jest-expo"
   },
   "dependencies": {
     "@expo/vector-icons": "~14.0.4",
-    "@react-native-async-storage/async-storage": "1.23.1",
+    "@react-native-async-storage/async-storage": "^1.23.1",
+    "@react-native-community/netinfo": "^11.4.1",
     "@react-navigation/bottom-tabs": "^7.2.0",
     "@react-navigation/native": "^7.0.14",
     "@reduxjs/toolkit": "^2.6.1",
+    "axios": "^1.10.0",
     "expo": "~52.0.47",
     "expo-blur": "~14.0.3",
     "expo-camera": "~16.0.18",
@@ -27,9 +30,9 @@
     "expo-dev-client": "~5.0.14",
     "expo-font": "~13.0.4",
     "expo-haptics": "~14.0.1",
+    "expo-image-picker": "~16.0.6",
     "expo-linking": "~7.0.5",
     "expo-media-library": "~17.0.6",
-    "expo-modules-autolinking": "~2.0.0",
     "expo-print": "~14.0.3",
     "expo-router": "~4.0.19",
     "expo-sharing": "~13.0.1",
@@ -50,8 +53,7 @@
     "react-native-view-shot": "^4.0.3",
     "react-native-web": "~0.19.13",
     "react-native-webview": "13.12.5",
-    "react-redux": "^9.2.0",
-    "@react-native-community/netinfo": "11.4.1"
+    "react-redux": "^9.2.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

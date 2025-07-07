@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "asudirApp",
-    "slug": "asudirapp",
+    "slug": "app-asudir",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -55,9 +55,9 @@
         "origin": false
       },
       "eas": {
-        "projectId": "31573a87-e9b9-4c5e-a7cd-b0d03414af22"
+        "projectId": "31f3974d-29e4-46c4-b5c3-889895c1925d"
       }
     },
-    "owner": "stevegomez"
+    "owner": "seghicito"
   }
 }
