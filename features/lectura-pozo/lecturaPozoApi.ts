@@ -89,13 +89,19 @@ export async function uploadFoto({
 }: {
   apiUrl: string;
   token: string;
-  uri?: string;
+  uri?: any; // Puede ser File (web) o string (móvil)
   field: string;
   lecturaId: string | number;
   filename: string;
 }) {
   const formData = new FormData();
-  if (uri) {
+  // Log de depuración
+  console.log('DEBUG uploadFoto - tipo de archivo:', typeof uri, uri instanceof File, uri);
+  if (typeof window !== 'undefined' && uri instanceof File) {
+    // WEB: File real
+    formData.append('files', uri);
+  } else if (uri && typeof uri === 'string') {
+    // MÓVIL: objeto { uri, name, type }
     formData.append('files', {
       uri,
       name: filename,

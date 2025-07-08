@@ -76,9 +76,6 @@ export default function NuevaCapturaScreen() {
     }, [pozoId, refetchPozoInfo])
   );
 
-  // Estado para mostrar el modal de previsualización
-  const [showPreview, setShowPreview] = useState(false)
-
   // Función para volver al Panel de Control
   const handleBack = () => {
     router.back()
@@ -139,21 +136,19 @@ export default function NuevaCapturaScreen() {
 
     if (Platform.OS === 'web') {
       const confirmed = window.confirm("¿Estás seguro de que todos los datos son correctos?");
-      if (confirmed) setShowPreview(true);
+      if (confirmed) handleConfirmar();
     } else {
     Alert.alert(
       "Confirmar Lectura",
       "¿Estás seguro de que todos los datos son correctos?",
       [
           { text: "Revisar", style: "cancel" },
-          { text: "Confirmar", onPress: () => setShowPreview(true) }
+          { text: "Confirmar", onPress: handleConfirmar }
         ]
       )
     }
   }
 
-  const [photoFile, setPhotoFile] = useState<File | null>(null); // Web volumétrico
-  const [photoFileElec, setPhotoFileElec] = useState<File | null>(null); // Web eléctrico
   const inputRef = useRef<HTMLInputElement>(null);
   const inputRefElec = useRef<HTMLInputElement>(null);
 
@@ -195,7 +190,7 @@ export default function NuevaCapturaScreen() {
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setPhotoFile(file);
+      form.setPhotoFile(file);
       form.setPhotoUri(URL.createObjectURL(file));
     }
   };
@@ -203,7 +198,7 @@ export default function NuevaCapturaScreen() {
   const handleFileInputChangeElec = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setPhotoFileElec(file);
+      form.setPhotoFileElec(file);
       form.setPhotoUriElec(URL.createObjectURL(file));
     }
   };
@@ -277,8 +272,8 @@ export default function NuevaCapturaScreen() {
           fecha: new Date().toISOString().split('T')[0],
           hora: new Date().toLocaleTimeString(),
           estado: 'pendiente',
-          photoVolumenUri: form.photoUri,
-          photoElectricaUri: form.photoUriElec,
+          photoVolumenUri: form.photoUri || '',
+          photoElectricaUri: form.photoUriElec || '',
           token: user.token,
           capturadorId: user.id
         }));
@@ -301,12 +296,12 @@ export default function NuevaCapturaScreen() {
 
       // 2. Subir foto eléctrica (si existe)
       let fotoElecOk = false;
-      if (form.photoUriElec) {
+      if ((Platform.OS === 'web' ? form.photoFileElec : form.photoUriElec)) {
         try {
           await uploadFoto({
             apiUrl: process.env.EXPO_PUBLIC_API_URL,
             token: user!.token,
-            uri: form.photoUriElec,
+            uri: Platform.OS === 'web' ? form.photoFileElec : form.photoUriElec,
             field: 'foto_electrico',
             lecturaId,
             filename: 'foto_electrico.jpg'
@@ -332,12 +327,12 @@ export default function NuevaCapturaScreen() {
       await new Promise(res => setTimeout(res, 1000));
       // 3. Subir foto volumétrica (si existe)
       let fotoVolOk = false;
-      if (form.photoUri) {
+      if ((Platform.OS === 'web' ? form.photoFile : form.photoUri)) {
         try {
           await uploadFoto({
             apiUrl: process.env.EXPO_PUBLIC_API_URL,
             token: user!.token,
-            uri: form.photoUri,
+            uri: Platform.OS === 'web' ? form.photoFile : form.photoUri,
             field: 'foto_volumetrico',
             lecturaId,
             filename: 'foto_volumetrico.jpg'
@@ -444,7 +439,7 @@ export default function NuevaCapturaScreen() {
               setLecturaVolumen={form.setLecturaVolumen}
               gasto={form.gasto}
               setGasto={form.setGasto}
-              photoUri={form.photoUri}
+              photoUri={form.photoUri || ''}
               handleChoosePhotoOption={handleChoosePhotoOption}
               anomaliasVol={form.anomaliasVol}
               setAnomaliasVol={form.setAnomaliasVol}
@@ -466,7 +461,7 @@ export default function NuevaCapturaScreen() {
             
             <FotosSection
               lecturaElectrica={form.lecturaElectrica}
-              photoUriElec={form.photoUriElec}
+              photoUriElec={form.photoUriElec || ''}
               showCameraElec={form.showCameraElec}
               setLecturaElectrica={form.setLecturaElectrica}
               setPhotoUriElec={form.setPhotoUriElec}
@@ -505,19 +500,25 @@ export default function NuevaCapturaScreen() {
             <TouchableOpacity style={[lecturaPozoStyles.button, { backgroundColor: '#eee' }]} onPress={handleBack}>
               <Text style={{ color: '#333' }}>Cancelar</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={[
-                lecturaPozoStyles.button, 
-                { 
-                  backgroundColor: form.photoUri && form.photoUriElec && form.lecturaVolumen && form.lecturaElectrica ? '#00A86B' : '#ccc'
+            <TouchableOpacity
+              style={lecturaPozoStyles.submitButton}
+              onPress={() => {
+                if (Platform.OS === 'web') {
+                  const confirmed = window.confirm("¿Estás seguro de que quieres enviar la lectura?");
+                  if (confirmed) handleConfirmar();
+                } else {
+                  Alert.alert(
+                    "Confirmar envío",
+                    "¿Estás seguro de que quieres enviar la lectura?",
+                    [
+                      { text: "Cancelar", style: "cancel" },
+                      { text: "Enviar", onPress: handleConfirmar }
+                    ]
+                  );
                 }
-              ]} 
-              onPress={handleGenerateTicket}
-              disabled={!form.photoUri || !form.photoUriElec || !form.lecturaVolumen || !form.lecturaElectrica}
+              }}
             >
-              <Text style={{ color: '#fff', fontWeight: 'bold' }}>
-                {form.photoUri && form.photoUriElec && form.lecturaVolumen && form.lecturaElectrica ? 'Validar y Guardar' : 'Completar Datos'}
-              </Text>
+              <Text style={lecturaPozoStyles.submitButtonText}>Validar y Guardar</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -531,25 +532,6 @@ export default function NuevaCapturaScreen() {
           title="Foto del Medidor Volumétrico"
         />
       </Modal>
-
-      <TicketPreviewModalSection
-        visible={showPreview}
-        onClose={() => setShowPreview(false)}
-        onConfirm={() => { handleConfirmar(); }}
-        ticketData={{
-          pozoNombre,
-          pozoId: pozoId,
-          volumen: form.lecturaVolumen,
-          gasto: form.gasto,
-          lecturaElectrica: form.lecturaElectrica,
-          observaciones: form.observaciones,
-          anomaliasVol: form.anomaliasVol,
-          anomaliasElec: form.anomaliasElec,
-          fecha: new Date().toLocaleDateString(),
-          photoUri: form.photoUri,
-          photoUriElec: form.photoUriElec,
-        }}
-      />
 
       {Platform.OS === 'web' && (
         <>

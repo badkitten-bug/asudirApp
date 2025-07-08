@@ -99,13 +99,8 @@ export function validateAuth(user: any, dispatch: any): ValidationResult {
 
 // Helper para validar información del pozo
 export function validatePozoInfo(pozoInfo: any, dispatch: any): ValidationResult {
-  if (!pozoInfo || !pozoInfo.id || !pozoInfo.usuario_pozos?.[0]?.id) {
-    dispatch(showSnackbar({ 
-      message: 'No se pudo obtener pozo o usuario_pozos', 
-      type: 'error', 
-      duration: 3000 
-    }));
-    return { isValid: false, message: "Información del pozo incompleta" };
+  if (!pozoInfo || !pozoInfo.id) {
+    return { valid: false, message: 'No se pudo obtener pozo' };
   }
   
   return { isValid: true };

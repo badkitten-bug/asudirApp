@@ -44,6 +44,8 @@ export function useLecturaPozoForm(pozoId: string) {
   const [lecturaElectrica, setLecturaElectrica] = useState(initialState.lecturaElectrica);
   const [photoUriElec, setPhotoUriElec] = useState<string | null>(initialState.photoUriElec);
   const [observaciones, setObservaciones] = useState(initialState.observaciones);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoFileElec, setPhotoFileElec] = useState<File | null>(null);
 
   // --- Persistencia temporal por pozo ---
   const STORAGE_KEY = `lecturaPozoForm:${pozoId}`;
@@ -72,6 +74,8 @@ export function useLecturaPozoForm(pozoId: string) {
           setLecturaElectrica(state.lecturaElectrica ?? initialState.lecturaElectrica);
           setPhotoUriElec(state.photoUriElec ?? initialState.photoUriElec);
           setObservaciones(state.observaciones ?? initialState.observaciones);
+          setPhotoFile(state.photoFile ?? null);
+          setPhotoFileElec(state.photoFileElec ?? null);
         }
       } catch (e) {
         // Si hay error, ignorar y usar estado inicial
@@ -101,6 +105,8 @@ export function useLecturaPozoForm(pozoId: string) {
         lecturaElectrica,
         photoUriElec,
         observaciones,
+        photoFile,
+        photoFileElec,
       };
       try {
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -110,7 +116,7 @@ export function useLecturaPozoForm(pozoId: string) {
     };
     saveState();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lecturaVolumen, photoUri, showCamera, showCameraElec, gasto, mostrarAnomaliasVol, mostrarAnomaliasElec, anomaliasVol, anomaliasElec, cambioSerieVol, cambioSerieElec, otroVol, otroElec, lecturaElectrica, photoUriElec, observaciones, pozoId]);
+  }, [lecturaVolumen, photoUri, showCamera, showCameraElec, gasto, mostrarAnomaliasVol, mostrarAnomaliasElec, anomaliasVol, anomaliasElec, cambioSerieVol, cambioSerieElec, otroVol, otroElec, lecturaElectrica, photoUriElec, observaciones, photoFile, photoFileElec, pozoId]);
 
   // Función para limpiar el estado (en memoria y en storage)
   const resetForm = async () => {
@@ -130,6 +136,8 @@ export function useLecturaPozoForm(pozoId: string) {
     setLecturaElectrica(initialState.lecturaElectrica);
     setPhotoUriElec(initialState.photoUriElec);
     setObservaciones(initialState.observaciones);
+    setPhotoFile(null);
+    setPhotoFileElec(null);
     try {
       await AsyncStorage.removeItem(STORAGE_KEY);
     } catch (e) {}
@@ -149,7 +157,7 @@ export function useLecturaPozoForm(pozoId: string) {
     } else {
       dispatch(showSnackbar({
         message: 'El gasto no puede ser mayor a 200 l/s',
-        type: 'warning',
+        type: 'error',
         duration: 3000,
       }));
     }
@@ -190,5 +198,7 @@ export function useLecturaPozoForm(pozoId: string) {
     handleLecturaElectricaChange,
     handleCheck,
     resetForm,
+    photoFile, setPhotoFile,
+    photoFileElec, setPhotoFileElec,
   };
 }

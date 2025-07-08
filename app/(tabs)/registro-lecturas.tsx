@@ -86,7 +86,7 @@ export default function RegistroLecturasScreen() {
       if (!user || !user.token) return;
       setIsLoading(true)
       try {
-        const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/lectura-pozos?populate[ticket]=true&populate[pozo]=true&populate[usuario_pozo]=true&populate[ciclo]=true`, {
+        const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/lectura-pozos?populate[pozo]=true`, {
           headers: { 'Authorization': `Bearer ${user.token}` }
         })
         const data = await res.json()
@@ -96,7 +96,6 @@ export default function RegistroLecturasScreen() {
           pozoNombre: l.pozo?.numeropozo ?? 'No disponible',
           pozoUbicacion: l.pozo?.predio ?? 'No disponible',
           bateria: l.pozo?.bateria?.nombrebateria ?? 'No disponible',
-          usuario: l.usuario_pozo?.nombre ?? 'No disponible',
           volumen: l.volumen ?? 'No disponible',
           gasto: l.gasto ?? 'No disponible',
           lecturaElectrica: l.lectura_electrica ?? 'No disponible',
@@ -206,7 +205,7 @@ export default function RegistroLecturasScreen() {
     if (!user || !user.token) return;
     setIsLoading(true)
     try {
-      const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/lectura-pozos?populate[ticket]=true&populate[pozo]=true&populate[usuario_pozo]=true&populate[ciclo]=true`, {
+      const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/lectura-pozos?populate[pozo]=true`, {
         headers: { 'Authorization': `Bearer ${user.token}` }
       })
       const data = await res.json()
@@ -216,7 +215,6 @@ export default function RegistroLecturasScreen() {
         pozoNombre: l.pozo?.numeropozo ?? 'No disponible',
         pozoUbicacion: l.pozo?.predio ?? 'No disponible',
         bateria: l.pozo?.bateria?.nombrebateria ?? 'No disponible',
-        usuario: l.usuario_pozo?.nombre ?? 'No disponible',
         volumen: l.volumen ?? 'No disponible',
         gasto: l.gasto ?? 'No disponible',
         lecturaElectrica: l.lectura_electrica ?? 'No disponible',
