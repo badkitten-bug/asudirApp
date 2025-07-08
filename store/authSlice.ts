@@ -1,5 +1,6 @@
 import { createSlice, type PayloadAction, createAsyncThunk } from "@reduxjs/toolkit"
 import AsyncStorage from "@react-native-async-storage/async-storage"
+import { getApiUrl, getAuthHeaders } from '@/src/config/api'
 
 // Modificar la interfaz User para incluir la contraseña (para validación local)
 interface User {
@@ -48,36 +49,41 @@ const AVAILABLE_USERS_KEY = "@auth_available_users"
 const AUTH_SYNC_DATE_KEY = "@auth_sync_date"
 
 // Thunk para cargar el usuario desde AsyncStorage
-export const loadUser = createAsyncThunk("auth/loadUser", async () => {
-  try {
-    const userJson = await AsyncStorage.getItem(USER_STORAGE_KEY)
-    const availableUsersJson = await AsyncStorage.getItem(AVAILABLE_USERS_KEY)
-    const lastSyncDate = await AsyncStorage.getItem(AUTH_SYNC_DATE_KEY)
-
-    let availableUsers = initialState.availableUsers
-
-    if (availableUsersJson) {
-      availableUsers = JSON.parse(availableUsersJson)
-      console.log("Usuarios disponibles cargados desde AsyncStorage:", availableUsers.length)
-    } else {
-      // Si no hay usuarios disponibles en AsyncStorage, guardar los iniciales
-      await AsyncStorage.setItem(AVAILABLE_USERS_KEY, JSON.stringify(initialState.availableUsers))
-      console.log("Usuarios iniciales guardados en AsyncStorage:", initialState.availableUsers.length)
+export const loadUser = createAsyncThunk(
+  'auth/loadUser',
+  async (_, { getState }) => {
+    const state = getState() as any;
+    const token = state.auth.token;
+    
+    if (!token) {
+      throw new Error('No hay token disponible');
     }
 
-    if (userJson) {
-      const user = JSON.parse(userJson)
-      console.log("Usuario cargado desde AsyncStorage:", user)
-      return { user, availableUsers, lastSyncDate }
+    try {
+      const url = `${getApiUrl()}/users/me`;
+      const headers = getAuthHeaders(token);
+      
+      console.log('URL de loadUser:', url);
+      console.log('Headers de loadUser:', headers);
+      
+      const res = await fetch(url, { headers });
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('Error response loadUser:', errorText);
+        throw new Error('Token inválido');
+      }
+      
+      const user = await res.json();
+      console.log('LoadUser response:', user);
+      
+      return user;
+    } catch (error) {
+      console.error('Error al cargar usuario:', error);
+      throw error;
     }
-
-    console.log("No se encontró usuario en AsyncStorage")
-    return { user: null, availableUsers, lastSyncDate }
-  } catch (error) {
-    console.error("Error loading user from storage:", error)
-    return { user: null, availableUsers: initialState.availableUsers, lastSyncDate: null }
   }
-})
+);
 
 // Thunk para guardar el usuario en AsyncStorage
 export const saveUser = createAsyncThunk("auth/saveUser", async (user: User) => {
@@ -249,7 +255,7 @@ const authSlice = createSlice({
           state.isAuthenticated = false
         }
         state.availableUsers = action.payload.availableUsers
-        state.lastSyncDate = action.payload.lastSyncDate
+        state.lastSyncDate = action.payload.syncDate
         state.isLoading = false
       })
       .addCase(loadUser.rejected, (state) => {

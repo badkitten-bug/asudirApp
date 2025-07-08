@@ -2,24 +2,38 @@ import { configureStore } from "@reduxjs/toolkit"
 import authReducer from "./authSlice"
 import snackbarReducer from "./snackbarSlice"
 import ticketsReducer from "./ticketsSlice"
-import signedTicketsReducer from "./signedTicketsSlice"
 import pozosReducer from "./pozosSlice"
 import { useDispatch as useReduxDispatch, useSelector as useReduxSelector } from "react-redux"
 import type { TypedUseSelectorHook } from "react-redux"
+
+// Middleware personalizado para logging
+const loggerMiddleware = (store: any) => (next: any) => (action: any) => {
+  if (__DEV__) {
+    console.group(action.type);
+    console.info('dispatching', action);
+    const result = next(action);
+    console.log('next state', store.getState());
+    console.groupEnd();
+    return result;
+  }
+  return next(action);
+};
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
     snackbar: snackbarReducer,
     tickets: ticketsReducer,
-    signedTickets: signedTicketsReducer,
     pozos: pozosReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
-      serializableCheck: false,
+      serializableCheck: {
+        ignoredActions: ['persist/PERSIST', 'persist/REHYDRATE'],
+      },
       immutableCheck: false,
-    }),
+    }).concat(loggerMiddleware),
+  devTools: __DEV__,
 })
 
 // Tipos para el store

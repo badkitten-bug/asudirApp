@@ -1,5 +1,6 @@
 import { createSlice, type PayloadAction, createAsyncThunk } from "@reduxjs/toolkit"
 import AsyncStorage from "@react-native-async-storage/async-storage"
+import { getApiUrl, getAuthHeaders } from '@/src/config/api'
 
 // Definir la estructura de un pozo
 export interface Pozo {
@@ -37,22 +38,41 @@ const POZOS_STORAGE_KEY = "@pozos_data"
 const POZOS_SYNC_DATE_KEY = "@pozos_sync_date"
 
 // Thunk para cargar los pozos desde AsyncStorage
-export const loadPozos = createAsyncThunk("pozos/loadPozos", async () => {
-  try {
-    const pozosJson = await AsyncStorage.getItem(POZOS_STORAGE_KEY)
-    const lastSyncDate = await AsyncStorage.getItem(POZOS_SYNC_DATE_KEY)
-    if (pozosJson) {
-      const pozos = JSON.parse(pozosJson)
-      console.log("Pozos cargados desde AsyncStorage:", pozos.length)
-      return { pozos, lastSyncDate }
+export const loadPozos = createAsyncThunk(
+  'pozos/loadPozos',
+  async (_, { getState }) => {
+    const state = getState() as any;
+    const token = state.auth.token;
+    
+    if (!token) {
+      throw new Error('No hay token disponible');
     }
-    // Si no hay datos en AsyncStorage, dejar el array vacío
-    return { pozos: [], lastSyncDate: null }
-  } catch (error) {
-    console.error("Error loading pozos from storage:", error)
-    return { pozos: [], lastSyncDate: null }
+
+    try {
+      const url = `${getApiUrl()}/pozos?populate[bateria]=true&populate[usuario_pozos]=true`;
+      const headers = getAuthHeaders(token);
+      
+      console.log('URL de loadPozos:', url);
+      console.log('Headers de loadPozos:', headers);
+      
+      const res = await fetch(url, { headers });
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('Error response loadPozos:', errorText);
+        throw new Error('Error al cargar pozos');
+      }
+      
+      const data = await res.json();
+      console.log('LoadPozos response:', data);
+      
+      return data.data || [];
+    } catch (error) {
+      console.error('Error al cargar pozos:', error);
+      throw error;
+    }
   }
-})
+);
 
 // Thunk para guardar los pozos en AsyncStorage
 export const savePozos = createAsyncThunk("pozos/savePozos", async (pozos: Pozo[]) => {
@@ -161,7 +181,7 @@ const pozosSlice = createSlice({
         state.error = null
       })
       .addCase(loadPozos.fulfilled, (state, action) => {
-        state.pozos = action.payload.pozos
+        state.pozos = action.payload
         state.lastSyncDate = action.payload.lastSyncDate
         state.isLoading = false
       })

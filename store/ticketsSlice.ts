@@ -1,6 +1,7 @@
 import { createSlice, type PayloadAction, createAsyncThunk } from "@reduxjs/toolkit"
 import { createSelector } from "@reduxjs/toolkit"
 import AsyncStorage from "@react-native-async-storage/async-storage"
+import { getApiUrl, getAuthHeaders } from '@/src/config/api'
 
 // Definir la estructura de un ticket
 export interface Ticket {
@@ -39,21 +40,41 @@ const initialState: TicketsState = {
 const TICKETS_STORAGE_KEY = "@tickets_data"
 
 // Thunk para cargar los tickets desde AsyncStorage
-export const loadTickets = createAsyncThunk("tickets/loadTickets", async () => {
-  try {
-    const ticketsJson = await AsyncStorage.getItem(TICKETS_STORAGE_KEY)
-    if (ticketsJson) {
-      const tickets = JSON.parse(ticketsJson)
-      console.log("Tickets cargados desde AsyncStorage:", tickets.length)
-      return tickets
+export const loadTickets = createAsyncThunk(
+  'tickets/loadTickets',
+  async (_, { getState }) => {
+    const state = getState() as any;
+    const token = state.auth.token;
+    
+    if (!token) {
+      throw new Error('No hay token disponible');
     }
-    console.log("No se encontraron tickets en AsyncStorage")
-    return []
-  } catch (error) {
-    console.error("Error loading tickets from storage:", error)
-    return []
+
+    try {
+      const url = `${getApiUrl()}/tickets?populate[lectura]=true&populate[lectura.pozo]=true&populate[lectura.pozo.bateria]=true&populate[lecturaAnterior]=true`;
+      const headers = getAuthHeaders(token);
+      
+      console.log('URL de loadTickets:', url);
+      console.log('Headers de loadTickets:', headers);
+      
+      const res = await fetch(url, { headers });
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('Error response loadTickets:', errorText);
+        throw new Error('Error al cargar tickets');
+      }
+      
+      const data = await res.json();
+      console.log('LoadTickets response:', data);
+      
+      return data.data || [];
+    } catch (error) {
+      console.error('Error al cargar tickets:', error);
+      throw error;
+    }
   }
-})
+);
 
 // Thunk para guardar los tickets en AsyncStorage
 export const saveTickets = createAsyncThunk("tickets/saveTickets", async (tickets: Ticket[]) => {
@@ -97,100 +118,53 @@ export const addTicket = createAsyncThunk("tickets/addTicket", async (ticket: Ti
 })
 
 // Thunk para sincronizar tickets (simulado)
-export const syncTickets = createAsyncThunk("tickets/syncTickets", async (_, { getState, dispatch }) => {
-  const state = getState() as { tickets: TicketsState }
-  const updatedTickets: Ticket[] = []
-  for (const ticket of state.tickets.tickets) {
-    if (ticket.estado === "sincronizado") {
-      updatedTickets.push(ticket)
-      continue
+export const syncTickets = createAsyncThunk(
+  'tickets/syncTickets',
+  async (_, { getState, dispatch }) => {
+    const state = getState() as any;
+    const token = state.auth.token;
+    const pendingTickets = state.tickets.pendingTickets;
+    
+    if (!token || pendingTickets.length === 0) {
+      return { synced: 0, failed: 0 };
     }
-    let idRemoto = ticket.idRemoto
-    // 1. Subir la lectura si no tiene idRemoto
-    if (!idRemoto) {
+
+    let synced = 0;
+    let failed = 0;
+
+    for (const ticket of pendingTickets) {
       try {
-        // Aquí debes llamar a tu función crearLecturaPozo y obtener el id remoto
-        const lecturaData = await crearLecturaPozo({
-          apiUrl: process.env.EXPO_PUBLIC_API_URL,
-          token: ticket.token, // Asegúrate de guardar el token necesario
-          data: {
-            fecha: ticket.fecha,
-            lectura_volumetrica: ticket.lecturaVolumen,
-            gasto: ticket.gastoPozo,
-            lectura_electrica: ticket.lecturaElectrica,
-            observaciones: ticket.observaciones,
-            pozo: ticket.pozoId,
-            capturador: ticket.capturadorId, // Asegúrate de guardar el id del capturador
-            estado: "pendiente"
-          }
-        })
-        idRemoto = lecturaData.data?.id
-        if (!idRemoto) throw new Error('No se obtuvo el ID remoto de la lectura')
-        ticket.idRemoto = idRemoto
-      } catch (err) {
-        // Si falla, mantener como pendiente
-        updatedTickets.push(ticket)
-        continue
+        const url = `${getApiUrl()}/tickets`;
+        const headers = getAuthHeaders(token);
+        const body = JSON.stringify({ data: ticket });
+        
+        console.log('URL de syncTickets:', url);
+        console.log('Headers de syncTickets:', headers);
+        console.log('Body de syncTickets:', body);
+        
+        const res = await fetch(url, {
+          method: 'POST',
+          headers,
+          body
+        });
+        
+        if (res.ok) {
+          synced++;
+          // Remover del estado local si se sincronizó exitosamente
+          dispatch(removePendingTicket(ticket.id));
+        } else {
+          failed++;
+          console.error(`Error al sincronizar ticket ${ticket.id}:`, await res.text());
+        }
+      } catch (error) {
+        failed++;
+        console.error(`Error al sincronizar ticket ${ticket.id}:`, error);
       }
     }
-    // 2. Subir foto volumétrica si no está subida
-    if (ticket.photoVolumenUri && !ticket.fotoVolumenSubida) {
-      try {
-        await uploadFoto({
-          apiUrl: process.env.EXPO_PUBLIC_API_URL,
-          token: ticket.token,
-          uri: ticket.photoVolumenUri,
-          field: 'foto_volumetrico',
-          lecturaId: idRemoto,
-          filename: 'foto_volumetrico.jpg'
-        })
-        ticket.fotoVolumenSubida = true
-      } catch (err) {
-        updatedTickets.push(ticket)
-        continue
-      }
-    }
-    // 3. Subir foto eléctrica si no está subida
-    if (ticket.photoElectricaUri && !ticket.fotoElectricaSubida) {
-      try {
-        await uploadFoto({
-          apiUrl: process.env.EXPO_PUBLIC_API_URL,
-          token: ticket.token,
-          uri: ticket.photoElectricaUri,
-          field: 'foto_electrico',
-          lecturaId: idRemoto,
-          filename: 'foto_electrico.jpg'
-        })
-        ticket.fotoElectricaSubida = true
-      } catch (err) {
-        updatedTickets.push(ticket)
-        continue
-      }
-    }
-    // 4. Validar con un GET que las fotos estén asociadas
-    try {
-      const url = `${process.env.EXPO_PUBLIC_API_URL}/lectura-pozos/${idRemoto}?populate=*`
-      const res = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${ticket.token}` }
-      })
-      const data = await res.json()
-      const tieneFotoVol = !!data?.data?.attributes?.foto_volumetrico?.data?.id
-      const tieneFotoElec = !!data?.data?.attributes?.foto_electrico?.data?.id
-      if (tieneFotoVol && tieneFotoElec) {
-        ticket.estado = "sincronizado"
-      } else {
-        updatedTickets.push(ticket)
-        continue
-      }
-    } catch (err) {
-      updatedTickets.push(ticket)
-      continue
-    }
-    updatedTickets.push(ticket)
+
+    return { synced, failed };
   }
-  await dispatch(saveTickets(updatedTickets))
-  return updatedTickets
-})
+);
 
 const ticketsSlice = createSlice({
   name: "tickets",

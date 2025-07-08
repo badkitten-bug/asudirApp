@@ -1,16 +1,13 @@
 "use client"
 
-import React from "react"
-import { useEffect } from "react"
-import { Stack } from "expo-router"
+import React, { useEffect, useState } from "react"
+import { Stack, useRouter, usePathname } from "expo-router"
 import { Provider } from "react-redux"
 import Snackbar from "../components/Snackbar"
 import { loadUser } from "../store/authSlice"
 import { View, ActivityIndicator, Text } from "react-native"
-import { useDispatch, useSelector,store } from "../store"
-// Agregar la importación de loadTickets, loadSignedTickets y loadPozos
+import { useDispatch, useSelector, store } from "../store"
 import { loadTickets } from "../store/ticketsSlice"
-import { loadSignedTickets } from "../store/signedTicketsSlice"
 import { loadPozos } from "../store/pozosSlice"
 import NetInfo from '@react-native-community/netinfo';
 import { syncTickets } from '../store/ticketsSlice';
@@ -27,30 +24,47 @@ function useAutoSyncTickets() {
   }, [dispatch]);
 }
 
-// Agregar la carga de tickets al iniciar la app
 function AuthWrapper() {
-  const dispatch = useDispatch()
-  const { isAuthenticated, isLoading } = useSelector((state:any) => state.auth)
+  const dispatch = useDispatch();
+  const router = useRouter();
+  const pathname = usePathname();
+  const { isAuthenticated, isLoading } = useSelector((state: any) => state.auth);
+  const [error, setError] = useState<string | null>(null);
 
   useAutoSyncTickets();
 
+  // Cargar usuario y datos solo una vez al montar
   useEffect(() => {
-    // Cargar usuario y tickets al iniciar la app
-    const loadData = async () => {
+    const loadAll = async () => {
       try {
-        await dispatch(loadUser())
-        if (isAuthenticated) {
-          await dispatch(loadTickets())
-          await dispatch(loadSignedTickets())
-          await dispatch(loadPozos())
-        }
-      } catch (error) {
-        console.error("Error al cargar datos:", error)
+        await dispatch(loadUser());
+        await dispatch(loadTickets());
+        await dispatch(loadPozos());
+      } catch (err) {
+        setError('Error al cargar datos iniciales.');
+      }
+    };
+    loadAll();
+  }, [dispatch]);
+
+  // Redirigir si cambia el estado de autenticación
+  useEffect(() => {
+    if (!isLoading && typeof pathname === 'string') {
+      if (isAuthenticated && pathname.startsWith('/(auth)')) {
+        router.replace('/(tabs)');
+      } else if (!isAuthenticated && !pathname.startsWith('/(auth)')) {
+        router.replace('/(auth)');
       }
     }
+  }, [isAuthenticated, isLoading, pathname, router]);
 
-    loadData()
-  }, [dispatch, isAuthenticated])
+  if (error) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#fff" }}>
+        <Text style={{ color: '#e74c3c', fontSize: 18, fontWeight: 'bold' }}>{error}</Text>
+      </View>
+    );
+  }
 
   // Mostrar indicador de carga mientras verificamos la autenticación
   if (isLoading) {
@@ -59,34 +73,27 @@ function AuthWrapper() {
         <ActivityIndicator size="large" color="#00A86B" />
         <Text style={{ marginTop: 16, color: "#333", fontSize: 16 }}>Cargando...</Text>
       </View>
-    )
+    );
   }
 
-  // Redirigir según el estado de autenticación
+  // Renderizar rutas según autenticación
   return (
     <Stack screenOptions={{ headerShown: false }}>
       {isAuthenticated ? (
-        <>
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="(auth)" options={{ presentation: "modal" }} />
-        </>
+        <Stack.Screen name="(tabs)" />
       ) : (
-        <>
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(tabs)" options={{ presentation: "modal" }} />
-        </>
+        <Stack.Screen name="(auth)" />
       )}
     </Stack>
-  )
+  );
 }
 
-// Componente principal
 export default function RootLayout() {
   return (
     <Provider store={store}>
       <AuthWrapper />
       <Snackbar />
     </Provider>
-  )
+  );
 }
 
