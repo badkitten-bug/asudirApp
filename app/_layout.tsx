@@ -14,6 +14,7 @@ import { loadSignedTickets } from "../store/signedTicketsSlice"
 import { loadPozos } from "../store/pozosSlice"
 import NetInfo from '@react-native-community/netinfo';
 import { syncTickets } from '../store/ticketsSlice';
+import { useSyncPendingLecturas } from '../hooks/useSyncPendingLecturas';
 
 function useAutoSyncTickets() {
   const dispatch = useDispatch();
@@ -33,23 +34,28 @@ function AuthWrapper() {
   const { isAuthenticated, isLoading } = useSelector((state:any) => state.auth)
 
   useAutoSyncTickets();
+  useSyncPendingLecturas();
 
   useEffect(() => {
+    let isMounted = true;
     // Cargar usuario y tickets al iniciar la app
     const loadData = async () => {
       try {
         await dispatch(loadUser())
-        if (isAuthenticated) {
+        if (isMounted && isAuthenticated) {
           await dispatch(loadTickets())
           await dispatch(loadSignedTickets())
           await dispatch(loadPozos())
         }
       } catch (error) {
-        console.error("Error al cargar datos:", error)
+        if (isMounted) {
+          console.error("Error al cargar datos:", error)
+        }
       }
     }
 
     loadData()
+    return () => { isMounted = false }
   }, [dispatch, isAuthenticated])
 
   // Mostrar indicador de carga mientras verificamos la autenticación

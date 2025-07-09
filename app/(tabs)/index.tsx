@@ -1,6 +1,6 @@
 "use client"
 import { useEffect } from "react"
-import { StyleSheet, View, Text, TouchableOpacity, ScrollView, StatusBar as RNStatusBar } from "react-native"
+import { StyleSheet, View, Text, TouchableOpacity, ScrollView, StatusBar as RNStatusBar, Platform } from "react-native"
 import { StatusBar } from "expo-status-bar"
 import { useSelector } from "react-redux"
 import { Ionicons } from "@expo/vector-icons"
@@ -23,6 +23,7 @@ export default function ControlPanel() {
   const pendingTickets = useSelector(selectPendingTickets)
   const todayTickets = useSelector(selectTodayTickets)
   const pozos = useSelector(selectAllPozos)
+  const pendingLecturas = useSelector((state:any) => state.pendingLecturas.items)
 
   // Cargar tickets al montar el componente
   useEffect(() => {
@@ -91,6 +92,14 @@ export default function ControlPanel() {
 
       {/* Espacio para el StatusBar */}
       <View style={{ height: STATUSBAR_HEIGHT, backgroundColor: "#f5f5f5" }} />
+
+      {pendingLecturas.length > 0 && (
+        <View style={{ backgroundColor: '#ff3b30', padding: 8, borderRadius: 8, margin: 16 }}>
+          <Text style={{ color: 'white', fontWeight: 'bold', textAlign: 'center' }}>
+            Tienes {pendingLecturas.length} lecturas pendientes por sincronizar
+          </Text>
+        </View>
+      )}
 
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Panel de Control</Text>
@@ -185,11 +194,15 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    ...(Platform.OS === 'web'
+      ? { boxShadow: "0px 2px 4px rgba(0,0,0,0.1)" }
+      : {
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 2,
+        }),
   },
   cardHeader: {
     flexDirection: "row",

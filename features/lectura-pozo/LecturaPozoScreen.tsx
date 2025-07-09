@@ -12,6 +12,8 @@ import { FotosSection } from './FotosSection';
 import { MedidorElectricoSection } from './MedidorElectricoSection';
 import { MedidorVolumetricoSection } from './MedidorVolumetricoSection';
 import { ObservacionesSection } from './ObservacionesSection';
+import { addPendingLectura } from '@/store/pendingLecturasSlice';
+import { v4 as uuidv4 } from 'uuid';
 
 type SubirFotoParams = {
   token: string;
@@ -91,12 +93,12 @@ export default function LecturaPozoScreen() {
     }
     setIsSubmitting(true);
     try {
-      // 1. Crear la lectura (sin imágenes)
+      // 1. Guardar la lectura y fotos en pendientes
       const lecturaData = {
         pozo: pozoInfo.id,
         lectura_volumetrica: parseInt(lecturaVolumen) || 0,
         lectura_electrica: parseInt(lecturaElectrica) || 0,
-        gasto: parseInt(gasto) || 0,
+        gasto: Math.min(parseInt(gasto) || 0, 200),
         anomalias_volumetrico: anomaliasVol,
         anomalias_electrico: anomaliasElec,
         cambio_serie_volumetrico: cambioSerieVol,
@@ -106,35 +108,27 @@ export default function LecturaPozoScreen() {
         observaciones: observaciones,
         capturador: user.id,
         fecha: new Date().toISOString(),
+        estado: 'pendiente',
       };
-      const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/lectura-pozos`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${user.token}`,
-        },
-        body: JSON.stringify({ data: lecturaData }),
-      });
-      if (!res.ok) throw new Error('Error al crear la lectura');
-      const lectura = await res.json();
-      const lecturaId = lectura.data?.id;
-      if (!lecturaId) throw new Error('No se pudo obtener el ID de la lectura');
-
-      // 2. Subir foto volumétrica
+      const fotos = [];
       if (photoUri) {
-        await subirFoto({ token: user.token, file: photoUri, lecturaId, field: 'foto_volumetrico' });
+        fotos.push({ field: 'foto_volumetrico', file: photoUri });
       }
-      // 3. Subir foto eléctrica
       if (photoUriElec) {
-        await subirFoto({ token: user.token, file: photoUriElec, lecturaId, field: 'foto_electrico' });
+        fotos.push({ field: 'foto_electrico', file: photoUriElec });
       }
-
-      dispatch(showSnackbar({ message: 'Lectura y fotos guardadas exitosamente', type: 'success', duration: 3000 }));
+      dispatch(addPendingLectura({
+        id: uuidv4(),
+        data: lecturaData,
+        fotos,
+        createdAt: new Date().toISOString(),
+      }));
+      dispatch(showSnackbar({ message: 'Lectura guardada localmente. Se sincronizará en segundo plano.', type: 'info', duration: 4000 }));
       await resetForm();
-      router.back();
+      router.replace('/(tabs)/seleccion-pozo');
     } catch (error: any) {
-      console.error('Error al guardar lectura o subir imágenes:', error);
-      dispatch(showSnackbar({ message: error.message || 'Error al guardar la lectura o subir imágenes', type: 'error', duration: 5000 }));
+      console.error('Error al guardar lectura local:', error);
+      dispatch(showSnackbar({ message: error.message || 'Error al guardar la lectura local', type: 'error', duration: 5000 }));
     } finally {
       setIsSubmitting(false);
     }

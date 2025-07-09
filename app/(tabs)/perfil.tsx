@@ -33,8 +33,10 @@ export default function PerfilScreen() {
         }),
       )
 
-      // Redirigimos al login
-      router.replace("/(auth)/login")
+      // Usar setTimeout para asegurar que la navegación ocurra después del render
+      setTimeout(() => {
+        router.replace("/(auth)/login")
+      }, 100)
     } catch (error) {
       console.error("Error al cerrar sesión:", error)
       dispatch(
