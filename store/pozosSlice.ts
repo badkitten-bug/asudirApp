@@ -82,7 +82,8 @@ export const syncPozos = createAsyncThunk("pozos/syncPozos", async (_, { getStat
     let baseUrl = process.env.EXPO_PUBLIC_API_URL || '';
     if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
     if (!baseUrl.endsWith('/api')) baseUrl = baseUrl + '/api';
-    const url = `${baseUrl}/pozos-capturador/${userId}`;
+    // Nuevo endpoint profesional:
+    const url = `${baseUrl}/lectura-pozos/pendientes-mes-capturador/${userId}`;
     console.log('URL de syncPozos:', url);
 
     const response = await fetch(url, {
@@ -91,11 +92,11 @@ export const syncPozos = createAsyncThunk("pozos/syncPozos", async (_, { getStat
         'Content-Type': 'application/json',
       },
     });
-    if (!response.ok) throw new Error('Error al obtener pozos');
+    if (!response.ok) throw new Error('Error al obtener pozos pendientes');
     const data = await response.json();
 
     // Mapea los pozos al formato que espera tu UI
-    const pozos = data.pozos.map((pozo: any) => ({
+    const pozos = data.data.map((pozo: any) => ({
       id: pozo.id.toString(),
       documentId: pozo.documentId,
       nombre: pozo.numeropozo,

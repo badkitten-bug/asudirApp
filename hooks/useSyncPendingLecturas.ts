@@ -14,6 +14,13 @@ async function subirLecturaYFotos(pending: PendingLectura, token: string) {
     },
     body: JSON.stringify({ data: pending.data }),
   });
+  if (res.status === 409) {
+    // Error de duplicado
+    const error = await res.json();
+    const err: any = new Error(error.error || 'Duplicado');
+    err.isDuplicate = true;
+    throw err;
+  }
   if (!res.ok) throw new Error('Error al crear la lectura');
   const lectura = await res.json();
   const lecturaId = lectura.data?.id;
@@ -57,8 +64,13 @@ export function useSyncPendingLecturas() {
             dispatch(removePendingLectura(pending.id));
             dispatch(showSnackbar({ message: 'Lectura sincronizada con éxito', type: 'success', duration: 3000 }));
           } catch (error: any) {
-            dispatch(showSnackbar({ message: error.message || 'Error al sincronizar lectura', type: 'error', duration: 4000 }));
-            break; // Si falla una, espera a la próxima conexión
+            if (error.isDuplicate) {
+              dispatch(removePendingLectura(pending.id));
+              dispatch(showSnackbar({ message: 'Ya existe una lectura para este pozo en el mes actual', type: 'warning', duration: 4000 }));
+            } else {
+              dispatch(showSnackbar({ message: error.message || 'Error al sincronizar lectura', type: 'error', duration: 4000 }));
+              break; // Si falla una, espera a la próxima conexión
+            }
           }
         }
       }
