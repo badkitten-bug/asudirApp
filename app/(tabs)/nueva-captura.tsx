@@ -25,7 +25,7 @@ import CameraScreen from "../../components/CameraScreen"
 import Checkbox from '../../components/Checkbox'
 import { selectUser } from '../../store/authSlice'
 
-import { addTicket } from '../../store/ticketsSlice'
+import { addTicket, removeTicket } from '../../store/ticketsSlice'
 import * as ImagePicker from 'expo-image-picker'
 import { MedidorVolumetricoSection } from '../../features/lectura-pozo/MedidorVolumetricoSection'
 import { ObservacionesSection } from '../../features/lectura-pozo/ObservacionesSection'
@@ -255,115 +255,115 @@ export default function NuevaCapturaScreen() {
       }
       Object.keys(lecturaPayload).forEach(key => lecturaPayload[key] === undefined && delete lecturaPayload[key]);
 
-      // Detectar conexión
-      const netState = await NetInfo.fetch();
-      if (!netState.isConnected) {
-        // Guardar localmente como pendiente
-        await dispatch(addTicket({
-          id: Date.now().toString(),
-          pozoId: pozoInfo?.id || '',
-          pozoNombre: pozoNombre || '',
-          pozoUbicacion: pozoUbicacion || '',
-          lecturaVolumen: form.lecturaVolumen,
-          lecturaElectrica: form.lecturaElectrica,
-          cargaMotor: '',
-          gastoPozo: form.gasto,
-          observaciones: form.observaciones,
-          fecha: new Date().toISOString().split('T')[0],
-          hora: new Date().toLocaleTimeString(),
-          estado: 'pendiente',
-          photoVolumenUri: form.photoUri || '',
-          photoElectricaUri: form.photoUriElec || '',
-          token: user.token,
-          capturadorId: user.id
-        }));
-        dispatch(showSnackbar({ message: 'Lectura guardada localmente (sin conexión). Se sincronizará cuando haya internet.', type: 'info', duration: 4000 }));
-        setTimeout(() => {
-          router.replace('/(tabs)/seleccion-pozo');
-        }, 1500);
-        await form.resetForm();
-        return;
+      // LOG DE DEPURACIÓN
+      console.log('LECTURA PAYLOAD QUE ENVÍA LA APP:', lecturaPayload);
+
+      // Preparar fotos para guardar localmente
+      const fotos = [];
+      if (Platform.OS === 'web' ? form.photoFile : form.photoUri) {
+        fotos.push({
+          field: 'foto_volumetrico',
+          file: Platform.OS === 'web' ? form.photoFile : form.photoUri
+        });
+      }
+      if (Platform.OS === 'web' ? form.photoFileElec : form.photoUriElec) {
+        fotos.push({
+          field: 'foto_electrico',
+          file: Platform.OS === 'web' ? form.photoFileElec : form.photoUriElec
+        });
       }
 
-      // 1. Crear la lectura (sin fotos)
-      const lecturaData = await crearLecturaPozo({
-        apiUrl: process.env.EXPO_PUBLIC_API_URL,
-        token: user!.token,
-        data: lecturaPayload
-      });
-      const lecturaId = lecturaData.data?.id;
-      if (!lecturaId) throw new Error('No se obtuvo el ID de la lectura creada');
+      // Guardar inmediatamente como pendiente local
+      const pendingId = Date.now().toString();
+      await dispatch(addTicket({
+        id: pendingId,
+        pozoId: pozoInfo?.id || '',
+        pozoNombre: pozoNombre || '',
+        pozoUbicacion: pozoUbicacion || '',
+        lecturaVolumen: form.lecturaVolumen,
+        lecturaElectrica: form.lecturaElectrica,
+        cargaMotor: '',
+        gastoPozo: form.gasto,
+        observaciones: form.observaciones,
+        fecha: new Date().toISOString().split('T')[0],
+        hora: new Date().toLocaleTimeString(),
+        estado: 'pendiente',
+        photoVolumenUri: form.photoUri || '',
+        photoElectricaUri: form.photoUriElec || '',
+        token: user.token,
+        capturadorId: user.id
+      }));
 
-      // 2. Subir foto eléctrica (si existe)
-      let fotoElecOk = false;
-      if ((Platform.OS === 'web' ? form.photoFileElec : form.photoUriElec)) {
-        try {
-          await uploadFoto({
-            apiUrl: process.env.EXPO_PUBLIC_API_URL,
-            token: user!.token,
-            uri: Platform.OS === 'web' ? form.photoFileElec : form.photoUriElec,
-            field: 'foto_electrico',
-            lecturaId,
-            filename: 'foto_electrico.jpg'
-          });
-          fotoElecOk = true;
-        } catch (err) {
-          // Validar con GET
-          try {
-            const url = `${process.env.EXPO_PUBLIC_API_URL}/lectura-pozos/${lecturaId}?populate=*`;
-            const res = await fetch(url, { headers: { 'Authorization': `Bearer ${user!.token}` } });
-            const data = await res.json();
-            fotoElecOk = !!data?.data?.attributes?.foto_electrico?.data?.id;
-          } catch (err2) {
-            fotoElecOk = false;
-          }
-        }
-        if (!fotoElecOk) {
-          dispatch(showSnackbar({ message: 'No se pudo asociar la foto eléctrica', type: 'error', duration: 3000 }));
-          return;
-        }
-      }
-      // Espera 1s para evitar problemas de concurrencia en Strapi/Windows
-      await new Promise(res => setTimeout(res, 1000));
-      // 3. Subir foto volumétrica (si existe)
-      let fotoVolOk = false;
-      if ((Platform.OS === 'web' ? form.photoFile : form.photoUri)) {
-        try {
-          await uploadFoto({
-            apiUrl: process.env.EXPO_PUBLIC_API_URL,
-            token: user!.token,
-            uri: Platform.OS === 'web' ? form.photoFile : form.photoUri,
-            field: 'foto_volumetrico',
-            lecturaId,
-            filename: 'foto_volumetrico.jpg'
-          });
-          fotoVolOk = true;
-        } catch (err) {
-          // Validar con GET
-          try {
-            const url = `${process.env.EXPO_PUBLIC_API_URL}/lectura-pozos/${lecturaId}?populate=*`;
-            const res = await fetch(url, { headers: { 'Authorization': `Bearer ${user!.token}` } });
-            const data = await res.json();
-            fotoVolOk = !!data?.data?.attributes?.foto_volumetrico?.data?.id;
-          } catch (err2) {
-            fotoVolOk = false;
-          }
-        }
-        if (!fotoVolOk) {
-          dispatch(showSnackbar({ message: 'No se pudo asociar la foto volumétrica', type: 'error', duration: 3000 }));
-          return;
-        }
-      }
-      // 4. Confirmación y navegación
+      // Mostrar éxito inmediato
       dispatch(showSnackbar({ 
-        message: 'Lectura guardada correctamente. Ticket generado.', 
+        message: 'Lectura guardada correctamente. Se sincronizará en segundo plano.', 
         type: 'success', 
         duration: 3000 
       }));
+
+      // Navegar inmediatamente
       setTimeout(() => {
         router.replace('/(tabs)/seleccion-pozo');
-      }, 1500);
+      }, 1000);
+
+      // Resetear formulario
       await form.resetForm();
+
+      // Intentar sincronizar en segundo plano (sin bloquear la UI)
+      NetInfo.fetch().then(netState => {
+        if (netState.isConnected) {
+          // Crear la lectura en el servidor
+          crearLecturaPozo({
+            apiUrl: process.env.EXPO_PUBLIC_API_URL,
+            token: user!.token,
+            data: lecturaPayload
+          }).then(lecturaData => {
+            const lecturaId = lecturaData.data?.id;
+            if (!lecturaId) {
+              console.log('No se pudo obtener ID de lectura del servidor');
+              return;
+            }
+
+            // Subir fotos en paralelo
+            const uploadPromises = fotos.map(async (foto) => {
+              try {
+                await uploadFoto({
+                  apiUrl: process.env.EXPO_PUBLIC_API_URL,
+                  token: user!.token,
+                  uri: foto.file,
+                  field: foto.field,
+                  lecturaId,
+                  filename: `${foto.field}.jpg`
+                });
+                return { success: true, field: foto.field };
+              } catch (error) {
+                console.log(`Error subiendo ${foto.field}:`, error);
+                return { success: false, field: foto.field };
+              }
+            });
+
+            Promise.all(uploadPromises).then(results => {
+              const failedUploads = results.filter(r => !r.success);
+              if (failedUploads.length === 0) {
+                // Todo exitoso, remover de pendientes
+                dispatch(removeTicket(pendingId));
+                dispatch(showSnackbar({ 
+                  message: 'Lectura sincronizada completamente con el servidor', 
+                  type: 'success', 
+                  duration: 2000 
+                }));
+              } else {
+                console.log('Algunas fotos no se pudieron subir:', failedUploads);
+                // Mantener como pendiente para reintentar
+              }
+            });
+          }).catch(error => {
+            console.log('Error sincronizando lectura:', error);
+            // Mantener como pendiente para reintentar
+          });
+        }
+      });
+
     } catch (error: any) {
       console.error('Error en handleConfirmar:', error)
       dispatch(showSnackbar({ 

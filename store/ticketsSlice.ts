@@ -1,6 +1,7 @@
 import { createSlice, type PayloadAction, createAsyncThunk } from "@reduxjs/toolkit"
 import { createSelector } from "@reduxjs/toolkit"
 import AsyncStorage from "@react-native-async-storage/async-storage"
+import { crearLecturaPozo, uploadFoto } from "../features/lectura-pozo/lecturaPozoApi"
 
 // Definir la estructura de un ticket
 export interface Ticket {
@@ -21,6 +22,8 @@ export interface Ticket {
   idRemoto?: string // ID en Strapi
   fotoVolumenSubida?: boolean
   fotoElectricaSubida?: boolean
+  token?: string // Token para autenticación
+  capturadorId?: string // ID del capturador
 }
 
 interface TicketsState {
@@ -98,6 +101,11 @@ export const addTicket = createAsyncThunk("tickets/addTicket", async (ticket: Ti
 
 // Thunk para sincronizar tickets (simulado)
 export const syncTickets = createAsyncThunk("tickets/syncTickets", async (_, { getState, dispatch }) => {
+  // Esta función está comentada temporalmente porque useSyncPendingLecturas maneja la sincronización
+  console.log('syncTickets called - using useSyncPendingLecturas instead');
+  return [];
+  
+  /*
   const state = getState() as { tickets: TicketsState }
   const updatedTickets: Ticket[] = []
   for (const ticket of state.tickets.tickets) {
@@ -109,10 +117,17 @@ export const syncTickets = createAsyncThunk("tickets/syncTickets", async (_, { g
     // 1. Subir la lectura si no tiene idRemoto
     if (!idRemoto) {
       try {
+        // Verificar que tengamos los datos necesarios
+        if (!ticket.token || !ticket.capturadorId) {
+          console.log('Ticket sin token o capturadorId, manteniendo como pendiente');
+          updatedTickets.push(ticket);
+          continue;
+        }
+
         // Aquí debes llamar a tu función crearLecturaPozo y obtener el id remoto
         const lecturaData = await crearLecturaPozo({
           apiUrl: process.env.EXPO_PUBLIC_API_URL,
-          token: ticket.token, // Asegúrate de guardar el token necesario
+          token: ticket.token as string,
           data: {
             fecha: ticket.fecha,
             lectura_volumetrica: ticket.lecturaVolumen,
@@ -120,7 +135,7 @@ export const syncTickets = createAsyncThunk("tickets/syncTickets", async (_, { g
             lectura_electrica: ticket.lecturaElectrica,
             observaciones: ticket.observaciones,
             pozo: ticket.pozoId,
-            capturador: ticket.capturadorId, // Asegúrate de guardar el id del capturador
+            capturador: ticket.capturadorId as string,
             estado: "pendiente"
           }
         })
@@ -134,14 +149,14 @@ export const syncTickets = createAsyncThunk("tickets/syncTickets", async (_, { g
       }
     }
     // 2. Subir foto volumétrica si no está subida
-    if (ticket.photoVolumenUri && !ticket.fotoVolumenSubida) {
+    if (ticket.photoVolumenUri && !ticket.fotoVolumenSubida && ticket.token && idRemoto) {
       try {
         await uploadFoto({
           apiUrl: process.env.EXPO_PUBLIC_API_URL,
-          token: ticket.token,
+          token: ticket.token as string,
           uri: ticket.photoVolumenUri,
           field: 'foto_volumetrico',
-          lecturaId: idRemoto,
+          lecturaId: idRemoto as string,
           filename: 'foto_volumetrico.jpg'
         })
         ticket.fotoVolumenSubida = true
@@ -151,14 +166,14 @@ export const syncTickets = createAsyncThunk("tickets/syncTickets", async (_, { g
       }
     }
     // 3. Subir foto eléctrica si no está subida
-    if (ticket.photoElectricaUri && !ticket.fotoElectricaSubida) {
+    if (ticket.photoElectricaUri && !ticket.fotoElectricaSubida && ticket.token && idRemoto) {
       try {
         await uploadFoto({
           apiUrl: process.env.EXPO_PUBLIC_API_URL,
-          token: ticket.token,
+          token: ticket.token as string,
           uri: ticket.photoElectricaUri,
           field: 'foto_electrico',
-          lecturaId: idRemoto,
+          lecturaId: idRemoto as string,
           filename: 'foto_electrico.jpg'
         })
         ticket.fotoElectricaSubida = true
@@ -168,28 +183,31 @@ export const syncTickets = createAsyncThunk("tickets/syncTickets", async (_, { g
       }
     }
     // 4. Validar con un GET que las fotos estén asociadas
-    try {
-      const url = `${process.env.EXPO_PUBLIC_API_URL}/lectura-pozos/${idRemoto}?populate=*`
-      const res = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${ticket.token}` }
-      })
-      const data = await res.json()
-      const tieneFotoVol = !!data?.data?.attributes?.foto_volumetrico?.data?.id
-      const tieneFotoElec = !!data?.data?.attributes?.foto_electrico?.data?.id
-      if (tieneFotoVol && tieneFotoElec) {
-        ticket.estado = "sincronizado"
-      } else {
+    if (ticket.token && idRemoto) {
+      try {
+        const url = `${process.env.EXPO_PUBLIC_API_URL}/lectura-pozos/${idRemoto}?populate=*`
+        const res = await fetch(url, {
+          headers: { 'Authorization': `Bearer ${ticket.token}` }
+        })
+        const data = await res.json()
+        const tieneFotoVol = !!data?.data?.attributes?.foto_volumetrico?.data?.id
+        const tieneFotoElec = !!data?.data?.attributes?.foto_electrico?.data?.id
+        if (tieneFotoVol && tieneFotoElec) {
+          ticket.estado = "sincronizado"
+        } else {
+          updatedTickets.push(ticket)
+          continue
+        }
+      } catch (err) {
         updatedTickets.push(ticket)
         continue
       }
-    } catch (err) {
-      updatedTickets.push(ticket)
-      continue
     }
     updatedTickets.push(ticket)
   }
   await dispatch(saveTickets(updatedTickets))
   return updatedTickets
+  */
 })
 
 const ticketsSlice = createSlice({
@@ -198,6 +216,9 @@ const ticketsSlice = createSlice({
   reducers: {
     setTickets: (state, action: PayloadAction<Ticket[]>) => {
       state.tickets = action.payload
+    },
+    removeTicket: (state, action: PayloadAction<string>) => {
+      state.tickets = state.tickets.filter(ticket => ticket.id !== action.payload)
     },
     clearTickets: (state) => {
       state.tickets = []
@@ -244,7 +265,7 @@ const ticketsSlice = createSlice({
   },
 })
 
-export const { setTickets, clearTickets } = ticketsSlice.actions
+export const { setTickets, removeTicket, clearTickets } = ticketsSlice.actions
 export default ticketsSlice.reducer
 
 // Selectores base

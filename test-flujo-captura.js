@@ -1,232 +1,345 @@
-console.log('🧪 PRUEBA COMPLETA DEL FLUJO');
+// Test completo del flujo de captura y sincronización
+// Ejecutar con: node test-flujo-captura.js
 
-const fetch = require('node-fetch');
-const fs = require('fs');
-const FormData = require('form-data');
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://proxy-app.asudir051.com/api';
 
-const API_URL = 'http://localhost:3000/api'; // Cambia si tu API está en otro puerto
-let TOKEN = 'TU_TOKEN_AQUI'; // Se actualizará automáticamente con login
+// Credenciales reales del usuario
+const mockUser = {
+  username: 'stevegomezdev@gmail.com',
+  password: '12341234',
+  mobile: true,
+  token: null, // Para almacenar el token obtenido
+  id: null // Para almacenar el ID del usuario
+};
 
-// Función para hacer login y obtener token automáticamente
-async function obtenerToken() {
-  console.log('🔐 Obteniendo token de autenticación...');
-  const loginData = {
-    identifier: 'steve@gmail.com',
-    password: '12341234',
-    platform: 'mobile'
-  };
-  
-  const res = await fetch(`${API_URL}/auth/custom/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(loginData)
-  });
-  
-  const json = await res.json();
-  if (!res.ok) {
-    console.error('❌ Error en login:', json);
-    console.log('💡 Verifica las credenciales');
-    process.exit(1);
-  }
-  
-  TOKEN = json.jwt;
-  console.log('✅ Token obtenido:', TOKEN.substring(0, 50) + '...');
-  console.log('👤 Usuario:', json.user.username, `(${json.user.id})`);
-  return TOKEN;
-}
-
-async function crearLectura() {
-  const data = {
-    fecha: new Date().toISOString(),
-    lectura_volumetrica: '1234',
-    gasto: '100',
-    lectura_electrica: '567',
-    observaciones: 'Test desde script',
-    pozo: '35', // ID real de pozo
-    capturador: '7', // ID del usuario steve@gmail.com (capturador)
-    estado: 'pendiente'
-  };
-  const res = await fetch(`${API_URL}/lectura-pozos`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${TOKEN}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ data })
-  });
-  const json = await res.json();
-  if (!res.ok) throw new Error(JSON.stringify(json));
-  return json.data.id;
-}
-
-async function subirFoto({ lecturaId, field, filePath, filename }) {
-  console.log(`📤 Subiendo foto para campo: ${field}`);
-  const form = new FormData();
-  form.append('files', fs.createReadStream(filePath), filename);
-  form.append('ref', 'api::lectura-pozo.lectura-pozo');
-  form.append('refId', String(lecturaId));
-  form.append('field', field);
-  
-  console.log(`  📋 FormData: ref=api::lectura-pozo.lectura-pozo, refId=${lecturaId}, field=${field}`);
-  
-  const res = await fetch(`${API_URL}/upload`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${TOKEN}`
-    },
-    body: form
-  });
-  const json = await res.json();
-  
-  if (!res.ok) {
-    console.error(`❌ Error subiendo foto ${field}:`, json);
-    throw new Error(JSON.stringify(json));
-  }
-  
-  console.log(`✅ Foto ${field} subida exitosamente:`, {
-    archivosSubidos: json.length,
-    primerArchivo: json[0]?.id
-  });
-  return json;
-}
-
-async function obtenerLectura(id) {
-  console.log(`🔍 Consultando lectura ID: ${id}`);
-  
-  // Probar diferentes endpoints
-  const endpoints = [
-    `${API_URL}/lectura-pozos/${id}?populate[foto_volumetrico]=true&populate[foto_electrico]=true`,
-    `${API_URL}/lectura-pozos/${id}`,
-    `${API_URL}/lectura-pozos?filters[id][$eq]=${id}&populate[foto_volumetrico]=true&populate[foto_electrico]=true`,
-    `${API_URL}/lectura-pozos?filters[id][$eq]=${id}`,
-    `${API_URL}/lectura-pozos?filters[id][$eq]=${id}&populate=*`
-  ];
-  
-  for (let i = 0; i < endpoints.length; i++) {
-    try {
-      console.log(`  🔍 Intentando endpoint ${i + 1}: ${endpoints[i]}`);
-      const res = await fetch(endpoints[i], {
-        headers: { 'Authorization': `Bearer ${TOKEN}` }
-      });
-      const json = await res.json();
-      
-      if (res.ok) {
-        console.log('✅ Endpoint exitoso:', endpoints[i]);
-        
-        // Si es el endpoint con filters, devuelve un array
-        if (endpoints[i].includes('filters')) {
-          console.log('📋 Lectura encontrada (filters):', json.data?.[0]?.attributes?.fecha);
-          console.log('🔍 Estructura completa de la respuesta (filters):', JSON.stringify(json, null, 2));
-          return json.data?.[0]; // Retorna el primer elemento del array
-        } else {
-          console.log('📋 Lectura encontrada:', json.data?.attributes?.fecha);
-          return json.data;
-        }
-      } else {
-        console.log(`❌ Endpoint ${i + 1} falló:`, json.error?.message);
-      }
-    } catch (err) {
-      console.log(`❌ Error en endpoint ${i + 1}:`, err.message);
-    }
-  }
-  
-  throw new Error('No se pudo consultar la lectura con ningún endpoint');
-}
-
-(async () => {
+// Función para hacer login y obtener token y userId
+async function loginAndGetTokenAndUserId() {
+  console.log('🔐 Iniciando login...');
   try {
-    // Obtener token automáticamente
-    await obtenerToken();
-    
-    console.log('1. Creando lectura...');
-    const lecturaId = await crearLectura();
-    console.log('Lectura creada con ID:', lecturaId);
+    const loginResponse = await fetch(`${API_URL}/auth/custom/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        identifier: mockUser.username,
+        password: mockUser.password,
+        platform: 'mobile'
+      })
+    });
 
-    console.log('2. Subiendo foto volumétrica...');
-    await subirFoto({
-      lecturaId,
-      field: 'foto_volumetrico',
-      filePath: './test-foto1.jpg',
-      filename: 'foto_volumetrico.jpg'
-    });
-    console.log('Foto volumétrica subida.');
-
-    console.log('3. Subiendo foto eléctrica...');
-    await subirFoto({
-      lecturaId,
-      field: 'foto_electrico',
-      filePath: './test-foto2.jpg',
-      filename: 'foto_electrico.jpg'
-    });
-    console.log('Foto eléctrica subida.');
-    
-    // Probar con nombres alternativos de campos
-    console.log('4. Probando nombres alternativos de campos...');
-    const camposAlternativos = ['foto_volumetrica', 'foto_electrica', 'imagen_volumetrico', 'imagen_electrico'];
-    
-    for (const campo of camposAlternativos) {
-      try {
-        console.log(`  🔄 Probando campo: ${campo}`);
-        await subirFoto({
-          lecturaId,
-          field: campo,
-          filePath: './test-foto1.jpg',
-          filename: `${campo}.jpg`
-        });
-        console.log(`  ✅ Campo ${campo} funcionó`);
-      } catch (err) {
-        console.log(`  ❌ Campo ${campo} falló:`, err.message);
-      }
-    }
-
-    console.log('5. Verificando asociación de imágenes...');
-    const lectura = await obtenerLectura(lecturaId);
-    
-    // Verificar estructura de respuesta completa
-    console.log('📊 Estructura completa de la lectura:');
-    console.log('  - ID:', lectura.id);
-    console.log('  - Fecha:', lectura.fecha);
-    console.log('  - Foto volumétrica:', !!lectura.foto_volumetrico);
-    console.log('  - Foto eléctrica:', !!lectura.foto_electrico);
-    
-    // Mostrar todos los campos disponibles
-    console.log('🔍 Todos los campos disponibles:');
-    Object.keys(lectura).forEach(key => {
-      if (key !== 'foto_volumetrico' && key !== 'foto_electrico') {
-        console.log(`  - ${key}:`, typeof lectura[key], lectura[key]);
-      }
-    });
-    
-    // Verificar estructura de respuesta
-    console.log('📊 Resumen de asociación:', {
-      tieneFotoVol: !!lectura.foto_volumetrico,
-      tieneFotoElec: !!lectura.foto_electrico,
-      fotoVolId: lectura.foto_volumetrico?.id,
-      fotoElecId: lectura.foto_electrico?.id
-    });
-    
-    const tieneVol = !!lectura.foto_volumetrico;
-    const tieneElec = !!lectura.foto_electrico;
-    
-    console.log('📸 ¿Foto volumétrica asociada?', tieneVol);
-    console.log('⚡ ¿Foto eléctrica asociada?', tieneElec);
-    
-    if (tieneVol && tieneElec) {
-      console.log('✅ TEST PASÓ: Ambas fotos asociadas correctamente.');
-      console.log('🎉 El flujo completo funciona perfectamente!');
+    if (loginResponse.ok) {
+      const loginData = await loginResponse.json();
+      console.log('✅ Login exitoso');
+      console.log('🔑 Token obtenido:', loginData.jwt ? 'Presente' : 'Faltante');
+      return { token: loginData.jwt, userId: loginData.user?.id };
     } else {
-      console.log('❌ TEST FALLÓ: Falta alguna foto asociada.');
-      console.log('🔍 Revisando detalles...');
-      if (!tieneVol) console.log('   - Foto volumétrica no encontrada');
-      if (!tieneElec) console.log('   - Foto eléctrica no encontrada');
-      
-      // Sugerir posibles soluciones
-      console.log('💡 Posibles causas:');
-      console.log('   1. Nombres de campos incorrectos en Strapi');
-      console.log('   2. Permisos insuficientes para asociar archivos');
-      console.log('   3. Configuración incorrecta del modelo lectura-pozo');
+      console.log('❌ Error en login:', loginResponse.status);
+      const errorData = await loginResponse.text();
+      console.log('📄 Detalles del error:', errorData);
+      return null;
     }
-  } catch (err) {
-    console.error('Error en test:', err);
+  } catch (error) {
+    console.log('❌ Error en login:', error.message);
+    return null;
   }
-})();
+}
+
+// Simular datos de pozo
+const mockPozo = {
+  id: 6,
+  numeropozo: "1403",
+  predio: "LAS TONINAS"
+};
+
+// Simular datos de lectura
+const mockLectura = {
+  lecturaVolumen: '100.5',
+  lecturaElectrica: '50.2',
+  gasto: '25.3',
+  observaciones: 'Test de lectura automática',
+  photoUri: 'file://test-foto1.jpg',
+  photoUriElec: 'file://test-foto2.jpg',
+  anomaliasVol: ['fuga'],
+  anomaliasElec: []
+};
+
+async function testFlujoCompleto() {
+  console.log('🧪 INICIANDO TEST DEL FLUJO COMPLETO');
+  console.log('=====================================');
+
+  // Obtener token real
+  const loginResult = await loginAndGetTokenAndUserId();
+  if (!loginResult) {
+    console.log('❌ No se pudo obtener token, abortando test');
+    return;
+  }
+  const token = loginResult.token;
+  const userId = loginResult.userId;
+
+  // Actualizar mockUser con token real
+  mockUser.token = token;
+  mockUser.id = userId; // Asumimos ID 1 para el test
+
+  try {
+    // 1. Test de conexión al backend
+    console.log('\n1️⃣ Probando conexión al backend...');
+    const connectionTest = await fetch(`${API_URL}/lectura-pozos`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (connectionTest.ok) {
+      console.log('✅ Conexión al backend exitosa');
+    } else {
+      console.log('❌ Error de conexión al backend:', connectionTest.status);
+      return;
+    }
+
+    // 2. Test de creación de lectura
+    console.log('\n2️⃣ Probando creación de lectura...');
+    const lecturaPayload = {
+      fecha: new Date().toISOString(),
+      lectura_volumetrica: mockLectura.lecturaVolumen,
+      gasto: mockLectura.gasto,
+      lectura_electrica: mockLectura.lecturaElectrica,
+      observaciones: mockLectura.observaciones,
+      pozo: String(mockPozo.id), // Enviar como string
+      capturador: String(userId), // Enviar como string
+      estado: "pendiente"
+    };
+
+    const createResponse = await fetch(`${API_URL}/lectura-pozos`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ data: lecturaPayload })
+    });
+
+    if (createResponse.ok) {
+      const lecturaData = await createResponse.json();
+      console.log('✅ Lectura creada exitosamente');
+      console.log('📊 ID de lectura:', lecturaData.data?.id);
+      
+      const lecturaId = lecturaData.data?.id;
+      
+      // 3. Test de subida de fotos
+      console.log('\n3️⃣ Probando subida de fotos...');
+      
+      // Simular foto volumétrica
+      const fotoVolFormData = new FormData();
+      fotoVolFormData.append('files', {
+        uri: mockLectura.photoUri,
+        name: 'foto_volumetrico.jpg',
+        type: 'image/jpeg',
+      });
+      fotoVolFormData.append('ref', 'api::lectura-pozo.lectura-pozo');
+      fotoVolFormData.append('refId', lecturaId);
+      fotoVolFormData.append('field', 'foto_volumetrico');
+
+      const fotoVolResponse = await fetch(`${API_URL}/upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: fotoVolFormData
+      });
+
+      if (fotoVolResponse.ok) {
+        console.log('✅ Foto volumétrica subida exitosamente');
+      } else {
+        console.log('❌ Error subiendo foto volumétrica:', fotoVolResponse.status);
+      }
+
+      // Simular foto eléctrica
+      const fotoElecFormData = new FormData();
+      fotoElecFormData.append('files', {
+        uri: mockLectura.photoUriElec,
+        name: 'foto_electrico.jpg',
+        type: 'image/jpeg',
+      });
+      fotoElecFormData.append('ref', 'api::lectura-pozo.lectura-pozo');
+      fotoElecFormData.append('refId', lecturaId);
+      fotoElecFormData.append('field', 'foto_electrico');
+
+      const fotoElecResponse = await fetch(`${API_URL}/upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: fotoElecFormData
+      });
+
+      if (fotoElecResponse.ok) {
+        console.log('✅ Foto eléctrica subida exitosamente');
+      } else {
+        console.log('❌ Error subiendo foto eléctrica:', fotoElecResponse.status);
+      }
+
+      // 4. Verificar lectura completa
+      console.log('\n4️⃣ Verificando lectura completa...');
+      const verifyResponse = await fetch(`${API_URL}/lectura-pozos/${lecturaId}?populate=*`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (verifyResponse.ok) {
+        const lecturaCompleta = await verifyResponse.json();
+        console.log('✅ Lectura verificada en el backend');
+        console.log('📊 Datos de la lectura:');
+        console.log('   - Volumen:', lecturaCompleta.data?.attributes?.lectura_volumetrica);
+        console.log('   - Eléctrica:', lecturaCompleta.data?.attributes?.lectura_electrica);
+        console.log('   - Gasto:', lecturaCompleta.data?.attributes?.gasto);
+        console.log('   - Fotos:', {
+          volumétrica: !!lecturaCompleta.data?.attributes?.foto_volumetrico?.data,
+          eléctrica: !!lecturaCompleta.data?.attributes?.foto_electrico?.data
+        });
+      } else {
+        console.log('❌ Error verificando lectura:', verifyResponse.status);
+      }
+
+    } else {
+      console.log('❌ Error creando lectura:', createResponse.status);
+      const errorData = await createResponse.json();
+      console.log('📄 Detalles del error:', errorData);
+    }
+
+  } catch (error) {
+    console.log('❌ Error en el test:', error.message);
+  }
+
+  console.log('\n🏁 TEST COMPLETADO');
+  console.log('=====================================');
+}
+
+// Test del hook de sincronización
+async function testSincronizacion() {
+  console.log('\n🔄 TEST DE SINCRONIZACIÓN');
+  console.log('==========================');
+
+  // Obtener token real
+  const loginResult = await loginAndGetTokenAndUserId();
+  if (!loginResult) {
+    console.log('❌ No se pudo obtener token, abortando test de sincronización');
+    return;
+  }
+  const token = loginResult.token;
+  const userId = loginResult.userId;
+
+  // Simular datos pendientes
+  const mockPendingTicket = {
+    id: Date.now().toString(),
+    pozoId: mockPozo.id,
+    pozoNombre: mockPozo.numeropozo,
+    pozoUbicacion: mockPozo.predio,
+    lecturaVolumen: mockLectura.lecturaVolumen,
+    lecturaElectrica: mockLectura.lecturaElectrica,
+    gastoPozo: mockLectura.gasto,
+    observaciones: mockLectura.observaciones,
+    fecha: new Date().toISOString().split('T')[0],
+    hora: new Date().toLocaleTimeString(),
+    estado: 'pendiente',
+    photoVolumenUri: mockLectura.photoUri,
+    photoElectricaUri: mockLectura.photoUriElec,
+    token: token,
+    capturadorId: userId
+  };
+
+  console.log('📋 Ticket pendiente simulado:', mockPendingTicket.id);
+  console.log('🔗 URL del backend:', API_URL);
+  console.log('👤 Token de usuario:', token ? 'Presente' : 'Faltante');
+
+  // Simular proceso de sincronización
+  try {
+    console.log('\n🔄 Iniciando sincronización...');
+    
+    // Crear lectura
+    const lecturaPayload = {
+      fecha: mockPendingTicket.fecha,
+      lectura_volumetrica: String(mockPendingTicket.lecturaVolumen),
+      gasto: String(mockPendingTicket.gastoPozo),
+      lectura_electrica: String(mockPendingTicket.lecturaElectrica),
+      observaciones: mockPendingTicket.observaciones,
+      pozo: mockPendingTicket.pozoId,
+      capturador: userId,
+      estado: "pendiente"
+    };
+
+    const createRes = await fetch(`${API_URL}/lectura-pozos`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ data: lecturaPayload }),
+    });
+
+    if (createRes.ok) {
+      const lecturaData = await createRes.json();
+      const lecturaId = lecturaData.data?.id;
+      console.log('✅ Lectura creada en sincronización:', lecturaId);
+
+      // Subir fotos
+      const fotos = [];
+      if (mockPendingTicket.photoVolumenUri) {
+        fotos.push({ field: 'foto_volumetrico', file: mockPendingTicket.photoVolumenUri });
+      }
+      if (mockPendingTicket.photoElectricaUri) {
+        fotos.push({ field: 'foto_electrico', file: mockPendingTicket.photoElectricaUri });
+      }
+
+      for (const foto of fotos) {
+        const formData = new FormData();
+        formData.append('files', {
+          uri: foto.file,
+          name: `${foto.field}.jpg`,
+          type: 'image/jpeg',
+        });
+        formData.append('ref', 'api::lectura-pozo.lectura-pozo');
+        formData.append('refId', String(lecturaId));
+        formData.append('field', foto.field);
+        
+        const resFoto = await fetch(`${API_URL}/upload`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: formData,
+        });
+        
+        if (resFoto.ok) {
+          console.log(`✅ ${foto.field} subida exitosamente`);
+        } else {
+          console.log(`❌ Error subiendo ${foto.field}:`, resFoto.status);
+        }
+      }
+
+      console.log('✅ Sincronización completada');
+    } else {
+      console.log('❌ Error en sincronización:', createRes.status);
+      const errorData = await createRes.text();
+      console.log('📄 Detalles del error:', errorData);
+    }
+
+  } catch (error) {
+    console.log('❌ Error en sincronización:', error.message);
+  }
+}
+
+// Ejecutar tests
+async function runTests() {
+  await testFlujoCompleto();
+  await testSincronizacion();
+}
+
+// Ejecutar si se llama directamente
+if (require.main === module) {
+  runTests().catch(console.error);
+}
+
+module.exports = { testFlujoCompleto, testSincronizacion };

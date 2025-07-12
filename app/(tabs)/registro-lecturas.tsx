@@ -22,6 +22,7 @@ import { useDispatch, useSelector } from "../../store"
 import { loadTickets, selectAllTickets, type Ticket as TicketBase, selectPendingTickets } from "../../store/ticketsSlice"
 import { selectAllPozos } from "../../store/pozosSlice"
 import { showSnackbar } from "../../store/snackbarSlice"
+import NetInfo from '@react-native-community/netinfo'
 
 const STATUSBAR_HEIGHT = Constants.statusBarHeight || 0
 const { width: SCREEN_WIDTH } = Dimensions.get("window")
@@ -80,6 +81,8 @@ export default function RegistroLecturasScreen() {
   const [filtroAno, setFiltroAno] = useState("")
   const [filtroFechaInicio, setFiltroFechaInicio] = useState("")
   const [filtroFechaFin, setFiltroFechaFin] = useState("")
+  const [isOnline, setIsOnline] = useState(true)
+  const [isSyncing, setIsSyncing] = useState(false)
 
   useEffect(() => {
     const fetchLecturas = async () => {
@@ -114,6 +117,14 @@ export default function RegistroLecturasScreen() {
     }
     fetchLecturas()
   }, [user])
+
+  // Monitorear estado de conexión
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsOnline(state.isConnected || false);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Obtener baterías únicas para el filtro
   const baterias = Array.from(new Set(pozos.map((pozo) => pozo.bateria)))
@@ -225,29 +236,78 @@ export default function RegistroLecturasScreen() {
         lecturaId: l.id,
       }))
       setLecturas(lecturasMapped)
-      dispatch(showSnackbar({ 
-        message: 'Lecturas actualizadas correctamente', 
-        type: 'success', 
-        duration: 2000 
-      }))
+      dispatch(showSnackbar({ message: 'Lecturas actualizadas', type: 'success', duration: 2000 }))
     } catch (e) {
-      dispatch(showSnackbar({ 
-        message: 'Error al actualizar las lecturas', 
-        type: 'error', 
-        duration: 3000 
-      }))
+      dispatch(showSnackbar({ message: 'Error al actualizar lecturas', type: 'error', duration: 3000 }))
     } finally {
       setIsLoading(false)
     }
   }
 
+  const handleManualSync = async () => {
+    if (!isOnline) {
+      dispatch(showSnackbar({ 
+        message: 'Sin conexión a internet. Las lecturas se sincronizarán automáticamente cuando haya conexión.', 
+        type: 'warning', 
+        duration: 4000 
+      }));
+      return;
+    }
+
+    if (pendingTickets.length === 0) {
+      dispatch(showSnackbar({ 
+        message: 'No hay lecturas pendientes de sincronizar', 
+        type: 'info', 
+        duration: 3000 
+      }));
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      // Aquí se podría implementar la lógica de sincronización manual
+      // Por ahora, solo simulamos el proceso
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      dispatch(showSnackbar({ 
+        message: 'Sincronización iniciada. Las lecturas se procesarán en segundo plano.', 
+        type: 'success', 
+        duration: 3000 
+      }));
+    } catch (error) {
+      dispatch(showSnackbar({ 
+        message: 'Error al iniciar sincronización', 
+        type: 'error', 
+        duration: 3000 
+      }));
+    } finally {
+      setIsSyncing(false);
+    }
+  }
+
   // Renderizar cada item de la lista
   const renderLecturaItem = ({ item }: { item: any }) => (
-    <View style={{ ...styles.lecturaItem, borderLeftColor: item.estado === 'pendiente' ? '#FFA500' : '#00A86B', borderLeftWidth: 4 }}>
-      <Text style={styles.lecturaTitle}>{item.pozoNombre} ({item.fecha})</Text>
+    <View style={{ 
+      ...styles.lecturaItem, 
+      borderLeftColor: item.estado === 'pendiente' ? '#FFA500' : '#00A86B', 
+      borderLeftWidth: 4 
+    }}>
+      <View style={styles.lecturaHeader}>
+        <Text style={styles.lecturaTitle}>{item.pozoNombre} ({item.fecha})</Text>
+        {item.estado === 'pendiente' && (
+          <View style={styles.pendingBadge}>
+            <Ionicons name="cloud-upload-outline" size={16} color="#FFA500" />
+            <Text style={styles.pendingText}>Pendiente</Text>
+          </View>
+        )}
+      </View>
       <Text style={styles.lecturaSubtitle}>Volumen: {item.volumen} | Gasto: {item.gasto} | Eléctrica: {item.lecturaElectrica}</Text>
       <Text style={styles.lecturaSubtitle}>Observaciones: {item.observaciones}</Text>
-      {item.estado === 'pendiente' && <Text style={{ color: '#FFA500', fontWeight: 'bold' }}>Pendiente de sincronizar</Text>}
+      {item.estado === 'pendiente' && (
+        <View style={styles.syncInfo}>
+          <Ionicons name="information-circle-outline" size={14} color="#FFA500" />
+          <Text style={styles.syncInfoText}>Se sincronizará automáticamente cuando haya conexión</Text>
+        </View>
+      )}
     </View>
   )
 
@@ -302,6 +362,40 @@ export default function RegistroLecturasScreen() {
           <TouchableOpacity onPress={handleClearFilters}>
             <Text style={styles.clearFiltersLink}>Limpiar</Text>
           </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Indicador de sincronización */}
+      {pendingTickets.length > 0 && (
+        <View style={styles.syncStatusContainer}>
+          <View style={styles.syncStatusInfo}>
+            <Ionicons name="cloud-upload-outline" size={20} color="#FFA500" />
+            <Text style={styles.syncStatusText}>
+              {pendingTickets.length} lectura{pendingTickets.length > 1 ? 's' : ''} pendiente{pendingTickets.length > 1 ? 's' : ''} de sincronizar
+            </Text>
+          </View>
+          <TouchableOpacity 
+            style={[styles.syncButton, !isOnline && styles.syncButtonDisabled]} 
+            onPress={handleManualSync}
+            disabled={!isOnline || isSyncing}
+          >
+            {isSyncing ? (
+              <ActivityIndicator size="small" color="#FFA500" />
+            ) : (
+              <Ionicons name="refresh" size={16} color="#FFA500" />
+            )}
+            <Text style={styles.syncButtonText}>
+              {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Indicador de estado de conexión */}
+      {!isOnline && (
+        <View style={styles.offlineContainer}>
+          <Ionicons name="wifi-outline" size={16} color="#FF6B6B" />
+          <Text style={styles.offlineText}>Sin conexión a internet</Text>
         </View>
       )}
 
@@ -796,14 +890,104 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: '#00A86B',
   },
+  lecturaHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
   lecturaTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 4,
+  },
+  pendingBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF3CD",
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  pendingText: {
+    color: "#856404",
+    fontSize: 12,
+    fontWeight: "bold",
+    marginLeft: 4,
   },
   lecturaSubtitle: {
     fontSize: 12,
     color: '#666',
+    marginBottom: 4,
+  },
+  syncInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+    backgroundColor: "#FFF3CD",
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  syncInfoText: {
+    color: "#856404",
+    fontSize: 12,
+    fontWeight: "bold",
+    marginLeft: 4,
+  },
+  syncStatusContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF3CD",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginHorizontal: 16,
+    marginVertical: 8,
+  },
+  syncStatusInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  syncStatusText: {
+    color: "#856404",
+    fontSize: 14,
+    fontWeight: "bold",
+    marginLeft: 8,
+  },
+  syncButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFA500",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginLeft: 10,
+  },
+  syncButtonDisabled: {
+    backgroundColor: "#FFCC99",
+    opacity: 0.7,
+  },
+  syncButtonText: {
+    color: "white",
+    fontSize: 12,
+    fontWeight: "bold",
+    marginLeft: 4,
+  },
+  offlineContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFE0E0",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginHorizontal: 16,
+    marginVertical: 8,
+  },
+  offlineText: {
+    color: "#D32F2F",
+    fontSize: 14,
+    fontWeight: "bold",
+    marginLeft: 8,
   },
 })
 

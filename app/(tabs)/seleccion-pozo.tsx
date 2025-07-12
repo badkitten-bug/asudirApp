@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import {
 } from "react-native"
 import { StatusBar } from "expo-status-bar"
 import { Ionicons } from "@expo/vector-icons"
-import { useRouter } from "expo-router"
+import { useRouter, useFocusEffect } from "expo-router"
 import Constants from "expo-constants"
 import { useDispatch, useSelector } from "../../store"
 import { showSnackbar } from "../../store/snackbarSlice"
@@ -62,6 +62,28 @@ export default function SeleccionPozoScreen() {
     }
     sync()
   }, [dispatch])
+
+  // Refrescar pozos al volver a la pantalla
+  useFocusEffect(
+    useCallback(() => {
+      const fetchPozos = async () => {
+        setIsSyncing(true);
+        try {
+          await dispatch(syncPozos()).unwrap();
+          await dispatch(loadPozos()).unwrap();
+        } catch (error) {
+          dispatch(showSnackbar({
+            message: 'Error al sincronizar pozos',
+            type: 'error',
+            duration: 3000,
+          }));
+        } finally {
+          setIsSyncing(false);
+        }
+      };
+      fetchPozos();
+    }, [dispatch])
+  );
 
   // Filtrar pozos según la búsqueda
   const filteredPozos = pozos.filter(

@@ -15,6 +15,8 @@ import { loadPozos } from "../store/pozosSlice"
 import NetInfo from '@react-native-community/netinfo';
 import { syncTickets } from '../store/ticketsSlice';
 import { useSyncPendingLecturas } from '../hooks/useSyncPendingLecturas';
+import { PersistGate } from 'redux-persist/integration/react';
+import { persistor } from '../store';
 
 function useAutoSyncTickets() {
   const dispatch = useDispatch();
@@ -90,8 +92,10 @@ function AuthWrapper() {
 export default function RootLayout() {
   return (
     <Provider store={store}>
-      <AuthWrapper />
-      <Snackbar />
+      <PersistGate loading={<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5f5f5' }}><ActivityIndicator size="large" color="#00A86B" /><Text style={{ marginTop: 16, color: '#333', fontSize: 16 }}>Cargando datos locales...</Text></View>} persistor={persistor}>
+        <AuthWrapper />
+        <Snackbar />
+      </PersistGate>
     </Provider>
   )
 }

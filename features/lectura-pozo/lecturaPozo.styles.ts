@@ -158,4 +158,19 @@ export const lecturaPozoStyles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
   },
+  submitButton: {
+    backgroundColor: "#00A86B",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    flex: 1,
+    marginLeft: 8,
+  },
+  submitButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
 }); 
