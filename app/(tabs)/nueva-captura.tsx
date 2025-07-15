@@ -25,7 +25,7 @@ import CameraScreen from "../../components/CameraScreen"
 import Checkbox from '../../components/Checkbox'
 import { selectUser } from '../../store/authSlice'
 
-import { addTicket, removeTicket } from '../../store/ticketsSlice'
+
 import * as ImagePicker from 'expo-image-picker'
 import { MedidorVolumetricoSection } from '../../features/lectura-pozo/MedidorVolumetricoSection'
 import { ObservacionesSection } from '../../features/lectura-pozo/ObservacionesSection'
@@ -275,24 +275,24 @@ export default function NuevaCapturaScreen() {
 
       // Guardar inmediatamente como pendiente local
       const pendingId = Date.now().toString();
-      await dispatch(addTicket({
-        id: pendingId,
-        pozoId: pozoInfo?.id || '',
-        pozoNombre: pozoNombre || '',
-        pozoUbicacion: pozoUbicacion || '',
-        lecturaVolumen: form.lecturaVolumen,
-        lecturaElectrica: form.lecturaElectrica,
-        cargaMotor: '',
-        gastoPozo: form.gasto,
-        observaciones: form.observaciones,
-        fecha: new Date().toISOString().split('T')[0],
-        hora: new Date().toLocaleTimeString(),
-        estado: 'pendiente',
-        photoVolumenUri: form.photoUri || '',
-        photoElectricaUri: form.photoUriElec || '',
-        token: user.token,
-        capturadorId: user.id
-      }));
+      // await dispatch(addTicket({ // Comentado temporalmente
+      //   id: pendingId,
+      //   pozoId: pozoInfo?.id || '',
+      //   pozoNombre: pozoNombre || '',
+      //   pozoUbicacion: pozoUbicacion || '',
+      //   lecturaVolumen: form.lecturaVolumen,
+      //   lecturaElectrica: form.lecturaElectrica,
+      //   cargaMotor: '',
+      //   gastoPozo: form.gasto,
+      //   observaciones: form.observaciones,
+      //   fecha: new Date().toISOString().split('T')[0],
+      //   hora: new Date().toLocaleTimeString(),
+      //   estado: 'pendiente',
+      //   photoVolumenUri: form.photoUri || '',
+      //   photoElectricaUri: form.photoUriElec || '',
+      //   token: user.token,
+      //   capturadorId: user.id
+      // }));
 
       // Mostrar éxito inmediato
       dispatch(showSnackbar({ 
@@ -346,7 +346,7 @@ export default function NuevaCapturaScreen() {
               const failedUploads = results.filter(r => !r.success);
               if (failedUploads.length === 0) {
                 // Todo exitoso, remover de pendientes
-                dispatch(removeTicket(pendingId));
+                // dispatch(removeTicket(pendingId)); // Comentado temporalmente
                 dispatch(showSnackbar({ 
                   message: 'Lectura sincronizada completamente con el servidor', 
                   type: 'success', 

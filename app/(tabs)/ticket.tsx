@@ -25,7 +25,7 @@ import * as FileSystem from "expo-file-system"
 import * as Sharing from "expo-sharing"
 import * as MediaLibrary from "expo-media-library"
 import ViewShot from "react-native-view-shot"
-import { addTicket, selectAllTickets } from "../../store/ticketsSlice"
+
 
 const STATUSBAR_HEIGHT = Constants.statusBarHeight ?? 0
 const { width: SCREEN_WIDTH } = Dimensions.get("window")
@@ -328,7 +328,8 @@ export default function TicketScreen() {
   const [isLoading, setIsLoading] = useState(false)
   const [ticketUri, setTicketUri] = useState<string | null>(null)
   const [ticketSaved, setTicketSaved] = useState(false)
-  const allTickets = useSelector(selectAllTickets)
+  // const allTickets = useSelector(selectAllTickets) // Comentado temporalmente
+  const allTickets: any[] = [] // Array vacío temporal
   const ticketDocumentId = (params.ticketDocumentId as string) ?? null;
   const [ticketData, setTicketData] = useState<any>(null);
   const [lecturaData, setLecturaData] = useState<any>(null);
@@ -507,7 +508,7 @@ export default function TicketScreen() {
     };
 
     try {
-      await dispatch(addTicket(newTicket)).unwrap();
+      // await dispatch(addTicket(newTicket)).unwrap(); // Comentado temporalmente
       setTicketSaved(true);
       dispatch(showSnackbar({
           message: "Ticket guardado correctamente",

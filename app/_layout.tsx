@@ -9,43 +9,29 @@ import { loadUser } from "../store/authSlice"
 import { View, ActivityIndicator, Text } from "react-native"
 import { useDispatch, useSelector,store } from "../store"
 // Agregar la importación de loadTickets, loadSignedTickets y loadPozos
-import { loadTickets } from "../store/ticketsSlice"
 import { loadSignedTickets } from "../store/signedTicketsSlice"
 import { loadPozos } from "../store/pozosSlice"
 import NetInfo from '@react-native-community/netinfo';
-import { syncTickets } from '../store/ticketsSlice';
 import { useSyncPendingLecturas } from '../hooks/useSyncPendingLecturas';
 import { PersistGate } from 'redux-persist/integration/react';
 import { persistor } from '../store';
 
-function useAutoSyncTickets() {
-  const dispatch = useDispatch();
-  useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener(state => {
-      if (state.isConnected) {
-        dispatch(syncTickets());
-      }
-    });
-    return () => unsubscribe();
-  }, [dispatch]);
-}
+
 
 // Agregar la carga de tickets al iniciar la app
 function AuthWrapper() {
   const dispatch = useDispatch()
   const { isAuthenticated, isLoading } = useSelector((state:any) => state.auth)
 
-  useAutoSyncTickets();
   useSyncPendingLecturas();
 
   useEffect(() => {
     let isMounted = true;
-    // Cargar usuario y tickets al iniciar la app
+    // Cargar usuario y datos al iniciar la app
     const loadData = async () => {
       try {
         await dispatch(loadUser())
         if (isMounted && isAuthenticated) {
-          await dispatch(loadTickets())
           await dispatch(loadSignedTickets())
           await dispatch(loadPozos())
         }

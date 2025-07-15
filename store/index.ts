@@ -3,7 +3,6 @@ import { persistStore, persistReducer } from "redux-persist"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import authReducer from "./authSlice"
 import snackbarReducer from "./snackbarSlice"
-import ticketsReducer from "./ticketsSlice"
 import signedTicketsReducer from "./signedTicketsSlice"
 import pozosReducer from "./pozosSlice"
 import pendingLecturasReducer from './pendingLecturasSlice';
@@ -13,7 +12,6 @@ import type { TypedUseSelectorHook } from "react-redux"
 const rootReducer = combineReducers({
   auth: authReducer,
   snackbar: snackbarReducer,
-  tickets: ticketsReducer,
   signedTickets: signedTicketsReducer,
   pozos: pozosReducer,
   pendingLecturas: pendingLecturasReducer,

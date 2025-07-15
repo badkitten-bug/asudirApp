@@ -8,7 +8,6 @@ import { useRouter } from "expo-router"
 import { showSnackbar } from "../../store/snackbarSlice"
 import Constants from "expo-constants"
 import { useDispatch } from "../../store"
-import { loadTickets, selectPendingTickets, selectTodayTickets, syncTickets } from "../../store/ticketsSlice"
 import { selectAllPozos, syncPozos } from "../../store/pozosSlice"
 
 const STATUSBAR_HEIGHT = Constants.statusBarHeight || 0
@@ -18,21 +17,18 @@ export default function ControlPanel() {
   const router = useRouter()
   const dispatch = useDispatch()
 
-  // Obtener datos reales de tickets
-  const pendingTickets = useSelector(selectPendingTickets)
-  const todayTickets = useSelector(selectTodayTickets)
+  // Usar pendingLecturasSlice para pendientes
+  const pendingLecturas = useSelector((state: any) => state.pendingLecturas?.items || [])
   const pozos = useSelector(selectAllPozos)
 
-  // Cargar tickets al montar el componente
-  useEffect(() => {
-    dispatch(loadTickets())
-  }, [dispatch])
+  // Si necesitas mostrar capturas recientes, puedes implementar lógica similar usando pendingLecturas o lecturas sincronizadas
+  // const todayLecturas = ...
+
+  // Elimina el useEffect de loadTickets
+  // useEffect(() => { dispatch(loadTickets()) }, [dispatch])
 
   const handleNewCapture = () => {
-    // Navegar a la pantalla de selección de pozo
     router.push("/(tabs)/seleccion-pozo")
-
-    // Mostrar mensaje informativo
     dispatch(
       showSnackbar({
         message: "Seleccione un pozo o use los datos predefinidos",
@@ -42,9 +38,7 @@ export default function ControlPanel() {
     )
   }
 
-  // Modificar la función handleSync para incluir la sincronización de usuarios
   const handleSync = async () => {
-    // Mostrar mensaje de inicio de sincronización
     dispatch(
       showSnackbar({
         message: "Sincronizando datos...",
@@ -52,14 +46,11 @@ export default function ControlPanel() {
         duration: 2000,
       }),
     )
-
     try {
-      // Sincronizar tickets, pozos y usuarios
       await Promise.all([
-        dispatch(syncTickets()).unwrap(),
+        // dispatch(syncTickets()).unwrap(), // Eliminar
         dispatch(syncPozos()).unwrap(),
       ])
-
       dispatch(
         showSnackbar({
           message: "¡Sincronización completada!",
@@ -106,18 +97,11 @@ export default function ControlPanel() {
             <Text style={styles.cardTitle}>Capturas Pendientes</Text>
             <Ionicons name="document-text-outline" size={24} color="#000" />
           </View>
-          <Text style={[styles.cardValue, styles.pendingValue]}>{pendingTickets.length}</Text>
+          <Text style={[styles.cardValue, styles.pendingValue]}>{pendingLecturas.length}</Text>
           <Text style={styles.cardSubtitle}>Pozos pendientes de captura</Text>
         </View>
 
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Capturas Recientes</Text>
-            <Ionicons name="time-outline" size={24} color="#000" />
-          </View>
-          <Text style={[styles.cardValue, styles.recentValue]}>{todayTickets.length}</Text>
-          <Text style={styles.cardSubtitle}>Capturas realizadas hoy</Text>
-        </View>
+        {/* Puedes implementar lógica para capturas recientes si lo necesitas */}
 
         <TouchableOpacity style={styles.card} onPress={handleSync}>
           <View style={styles.cardHeader}>
@@ -125,7 +109,7 @@ export default function ControlPanel() {
             <Ionicons name="sync-outline" size={24} color="#000" />
           </View>
           <Text style={[styles.cardValue, styles.syncValue]}>
-            {pendingTickets.length > 0 ? `${pendingTickets.length} pendientes` : "Actualizado"}
+            {pendingLecturas.length > 0 ? `${pendingLecturas.length} pendientes` : "Actualizado"}
           </Text>
           <Text style={styles.cardSubtitle}>{pozos.length} pozos disponibles</Text>
         </TouchableOpacity>

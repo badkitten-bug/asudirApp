@@ -15,7 +15,6 @@ import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import Constants from "expo-constants"
 import { useDispatch, useSelector } from "../../store"
-import { loadTickets, selectAllTickets } from "../../store/ticketsSlice"
 import { showSnackbar } from "../../store/snackbarSlice"
 
 const STATUSBAR_HEIGHT = Constants.statusBarHeight || 0
@@ -23,30 +22,31 @@ const STATUSBAR_HEIGHT = Constants.statusBarHeight || 0
 export default function CarpetaRecibosScreen() {
   const router = useRouter()
   const dispatch = useDispatch()
-  const tickets = useSelector(selectAllTickets)
-  const [isLoading, setIsLoading] = useState(true)
+  // const tickets = useSelector(selectAllTickets) // Comentado temporalmente
+  const tickets: any[] = [] // Array vacío temporal
+  const [isLoading, setIsLoading] = useState(false) // Cambiado a false
 
   // Cargar tickets al montar el componente
-  useEffect(() => {
-    const fetchTickets = async () => {
-      try {
-        await dispatch(loadTickets()).unwrap()
-      } catch (error) {
-        console.error("Error al cargar tickets:", error)
-        dispatch(
-          showSnackbar({
-            message: "Error al cargar los recibos",
-            type: "error",
-            duration: 3000,
-          }),
-        )
-      } finally {
-        setIsLoading(false)
-      }
-    }
+  // useEffect(() => {
+  //   const fetchTickets = async () => {
+  //     try {
+  //       await dispatch(loadTickets()).unwrap()
+  //     } catch (error) {
+  //       console.error("Error al cargar tickets:", error)
+  //       dispatch(
+  //         showSnackbar({
+  //           message: "Error al cargar los recibos",
+  //           type: "error",
+  //           duration: 3000,
+  //         }),
+  //       )
+  //     } finally {
+  //       setIsLoading(false)
+  //     }
+  //   }
 
-    fetchTickets()
-  }, [dispatch])
+  //   fetchTickets()
+  // }, [dispatch])
 
   // Función para crear un nuevo ticket
   const handleNuevoTicket = () => {

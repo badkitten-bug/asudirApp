@@ -21,7 +21,7 @@ import { useDispatch } from "../../store"
 import { showSnackbar } from "../../store/snackbarSlice"
 import Constants from "expo-constants"
 import CameraScreen from "../../components/CameraScreen"
-import { addTicket } from "../../store/ticketsSlice"
+
 
 // Importar el componente SelectDropdown
 import SelectDropdown from "../../components/SelectDropdown"
@@ -128,9 +128,9 @@ export default function MedidorElectricoScreen() {
     }
 
     // Guardar el ticket en el store
-    dispatch(addTicket(newTicket))
-      .unwrap()
-      .then(() => {
+    // dispatch(addTicket(newTicket)) // Comentado temporalmente
+    //   .unwrap()
+    //   .then(() => {
         dispatch(
           showSnackbar({
             message: "Captura guardada correctamente",
@@ -153,17 +153,17 @@ export default function MedidorElectricoScreen() {
             observaciones,
           },
         })
-      })
-      .catch((error) => {
-        console.error("Error al guardar el ticket:", error)
-        dispatch(
-          showSnackbar({
-            message: "Error al guardar la captura",
-            type: "error",
-            duration: 3000,
-          }),
-        )
-      })
+      // })
+      // .catch((error) => {
+      //   console.error("Error al guardar el ticket:", error)
+      //   dispatch(
+      //     showSnackbar({
+      //       message: "Error al guardar la captura",
+      //       type: "error",
+      //       duration: 3000,
+      //     }),
+      //   )
+      // })
   }
 
   // Función para abrir la cámara

@@ -8,7 +8,7 @@ import { useRouter } from "expo-router"
 import { showSnackbar } from "../../store/snackbarSlice"
 import Constants from "expo-constants"
 import { useDispatch } from "../../store"
-import { loadTickets, selectPendingTickets, selectTodayTickets, syncTickets } from "../../store/ticketsSlice"
+
 import { selectAllPozos, syncPozos } from "../../store/pozosSlice"
 import { syncUsers } from "../../store/authSlice"
 
@@ -20,15 +20,17 @@ export default function ControlPanel() {
   const dispatch = useDispatch()
 
   // Obtener datos reales de tickets
-  const pendingTickets = useSelector(selectPendingTickets)
-  const todayTickets = useSelector(selectTodayTickets)
+  // const pendingTickets = useSelector(selectPendingTickets) // Comentado temporalmente
+  // const todayTickets = useSelector(selectTodayTickets) // Comentado temporalmente
+  const pendingTickets: any[] = [] // Array vacío temporal
+  const todayTickets: any[] = [] // Array vacío temporal
   const pozos = useSelector(selectAllPozos)
   const pendingLecturas = useSelector((state:any) => state.pendingLecturas.items)
 
   // Cargar tickets al montar el componente
-  useEffect(() => {
-    dispatch(loadTickets())
-  }, [dispatch])
+  // useEffect(() => {
+  //   dispatch(loadTickets())
+  // }, [dispatch])
 
   const handleNewCapture = () => {
     // Navegar a la pantalla de selección de pozo
@@ -58,7 +60,7 @@ export default function ControlPanel() {
     try {
       // Sincronizar tickets, pozos y usuarios
       await Promise.all([
-        dispatch(syncTickets()).unwrap(),
+        // dispatch(syncTickets()).unwrap(), // Comentado temporalmente
         dispatch(syncPozos()).unwrap(),
         dispatch(syncUsers()).unwrap(),
       ])
