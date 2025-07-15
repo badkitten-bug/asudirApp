@@ -19,10 +19,9 @@ import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import Constants from "expo-constants"
 import { useDispatch, useSelector } from "../../store"
-import { loadTickets, selectAllTickets, type Ticket as TicketBase, selectPendingTickets } from "../../store/ticketsSlice"
-import { selectAllPozos } from "../../store/pozosSlice"
 import { showSnackbar } from "../../store/snackbarSlice"
 import NetInfo from '@react-native-community/netinfo'
+import { selectAllPozos } from "../../store/pozosSlice"
 
 const STATUSBAR_HEIGHT = Constants.statusBarHeight || 0
 const { width: SCREEN_WIDTH } = Dimensions.get("window")
@@ -65,7 +64,8 @@ export default function RegistroLecturasScreen() {
   const dispatch = useDispatch()
   const pozos = useSelector(selectAllPozos)
   const user = useSelector((state: any) => state.auth.user)
-  const pendingTickets = useSelector(selectPendingTickets)
+  // Usar solo pendingLecturasSlice
+  const pendingLecturas = useSelector((state: any) => state.pendingLecturas?.items || [])
 
   // Estado para lecturas reales del backend
   const [lecturas, setLecturas] = useState<LecturaData[]>([])
@@ -181,19 +181,19 @@ export default function RegistroLecturasScreen() {
   })
 
   // Unificar lecturas del backend y pendientes locales
-  const lecturasPendientesUI = pendingTickets.map((t) => ({
-    fecha: t.fecha,
-    pozoNombre: t.pozoNombre,
-    pozoUbicacion: t.pozoUbicacion,
-    bateria: '',
+  const lecturasPendientesUI = pendingLecturas.map((t) => ({
+    fecha: t.data.fecha,
+    pozoNombre: pozos.find((p) => p.id === t.data.pozo)?.numeropozo || '',
+    pozoUbicacion: pozos.find((p) => p.id === t.data.pozo)?.predio || '',
+    bateria: pozos.find((p) => p.id === t.data.pozo)?.bateria || '',
     usuario: '',
-    volumen: t.lecturaVolumen,
-    gasto: t.gastoPozo,
-    lecturaElectrica: t.lecturaElectrica,
-    observaciones: t.observaciones,
+    volumen: t.data.lectura_volumetrica,
+    gasto: t.data.gasto,
+    lecturaElectrica: t.data.lectura_electrica,
+    observaciones: t.data.observaciones,
     ticketNumero: t.id,
     ticketId: null,
-    pozoId: t.pozoId,
+    pozoId: t.data.pozo,
     lecturaId: t.id,
     estado: 'pendiente',
   }));
@@ -254,7 +254,7 @@ export default function RegistroLecturasScreen() {
       return;
     }
 
-    if (pendingTickets.length === 0) {
+    if (pendingLecturas.length === 0) {
       dispatch(showSnackbar({ 
         message: 'No hay lecturas pendientes de sincronizar', 
         type: 'info', 
@@ -366,12 +366,12 @@ export default function RegistroLecturasScreen() {
       )}
 
       {/* Indicador de sincronización */}
-      {pendingTickets.length > 0 && (
+      {pendingLecturas.length > 0 && (
         <View style={styles.syncStatusContainer}>
           <View style={styles.syncStatusInfo}>
             <Ionicons name="cloud-upload-outline" size={20} color="#FFA500" />
             <Text style={styles.syncStatusText}>
-              {pendingTickets.length} lectura{pendingTickets.length > 1 ? 's' : ''} pendiente{pendingTickets.length > 1 ? 's' : ''} de sincronizar
+              {pendingLecturas.length} lectura{pendingLecturas.length > 1 ? 's' : ''} pendiente{pendingLecturas.length > 1 ? 's' : ''} de sincronizar
             </Text>
           </View>
           <TouchableOpacity 
