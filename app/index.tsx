@@ -1,19 +1,6 @@
-import { Redirect } from "expo-router"
-import { useSelector } from "react-redux"
+import { Redirect } from "expo-router";
 
 export default function Index() {
-  const { isAuthenticated, isLoading } = useSelector((state:any) => state.auth)
-
-  // Si todavía está cargando, no redirigir aún
-  if (isLoading) {
-    return null
-  }
-
-  // Redirigir según el estado de autenticación
-  if (isAuthenticated) {
-    return <Redirect href="/(tabs)" />
-  } else {
-    return <Redirect href="/(auth)/login" />
-  }
+	// Redirigir directamente al splash para el nuevo flujo
+	return <Redirect href="/splash" />;
 }
-

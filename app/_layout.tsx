@@ -1,88 +1,97 @@
-"use client"
+"use client";
 
-import React from "react"
-import { useEffect } from "react"
-import { Stack } from "expo-router"
-import { Provider } from "react-redux"
-import Snackbar from "../components/Snackbar"
-import { loadUser } from "../store/authSlice"
-import { View, ActivityIndicator, Text } from "react-native"
-import { useDispatch, useSelector,store } from "../store"
-// Agregar la importación de loadTickets, loadSignedTickets y loadPozos
-import { loadSignedTickets } from "../store/signedTicketsSlice"
-import { loadPozos } from "../store/pozosSlice"
-import NetInfo from '@react-native-community/netinfo';
-import { useSyncPendingLecturas } from '../hooks/useSyncPendingLecturas';
-import { PersistGate } from 'redux-persist/integration/react';
-import { persistor } from '../store';
+import { useEffect } from "react";
+import { Stack } from "expo-router";
+import { Provider } from "react-redux";
+import Snackbar from "../components/Snackbar";
+import { loadUser } from "../store/authSlice";
+import { View, ActivityIndicator, Text } from "react-native";
+import { useDispatch, useSelector, store, type RootState } from "../store";
+import { PersistGate } from "redux-persist/integration/react";
+import { persistor } from "../store";
 
-
-
-// Agregar la carga de tickets al iniciar la app
 function AuthWrapper() {
-  const dispatch = useDispatch()
-  const { isAuthenticated, isLoading } = useSelector((state:any) => state.auth)
+	const dispatch = useDispatch();
+	const { isAuthenticated, isLoading } = useSelector(
+		(state: RootState) => state.auth,
+	);
 
-  useSyncPendingLecturas();
+	useEffect(() => {
+		let isMounted = true;
+		const loadData = async () => {
+			try {
+				await dispatch(loadUser());
+			} catch (error) {
+				if (isMounted) {
+					console.error("Error al cargar datos:", error);
+				}
+			}
+		};
 
-  useEffect(() => {
-    let isMounted = true;
-    // Cargar usuario y datos al iniciar la app
-    const loadData = async () => {
-      try {
-        await dispatch(loadUser())
-        if (isMounted && isAuthenticated) {
-          await dispatch(loadSignedTickets())
-          await dispatch(loadPozos())
-        }
-      } catch (error) {
-        if (isMounted) {
-          console.error("Error al cargar datos:", error)
-        }
-      }
-    }
+		loadData();
+		return () => {
+			isMounted = false;
+		};
+	}, [dispatch]);
 
-    loadData()
-    return () => { isMounted = false }
-  }, [dispatch, isAuthenticated])
+	if (isLoading) {
+		return (
+			<View
+				style={{
+					flex: 1,
+					justifyContent: "center",
+					alignItems: "center",
+					backgroundColor: "#f5f5f5",
+				}}
+			>
+				<ActivityIndicator size="large" color="#00A86B" />
+				<Text style={{ marginTop: 16, color: "#333", fontSize: 16 }}>
+					Cargando...
+				</Text>
+			</View>
+		);
+	}
 
-  // Mostrar indicador de carga mientras verificamos la autenticación
-  if (isLoading) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#f5f5f5" }}>
-        <ActivityIndicator size="large" color="#00A86B" />
-        <Text style={{ marginTop: 16, color: "#333", fontSize: 16 }}>Cargando...</Text>
-      </View>
-    )
-  }
-
-  // Redirigir según el estado de autenticación
-  return (
-    <Stack screenOptions={{ headerShown: false }}>
-      {isAuthenticated ? (
-        <>
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="(auth)" options={{ presentation: "modal" }} />
-        </>
-      ) : (
-        <>
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(tabs)" options={{ presentation: "modal" }} />
-        </>
-      )}
-    </Stack>
-  )
+	return (
+		<Stack screenOptions={{ headerShown: false }}>
+			<Stack.Screen name="splash" />
+			<Stack.Screen name="verification-start" />
+			<Stack.Screen name="personal-data" />
+			<Stack.Screen name="activation-code" />
+			<Stack.Screen name="qr-display" />
+			<Stack.Screen name="qr-scanner" />
+			<Stack.Screen name="requirements" />
+			<Stack.Screen name="biometric" />
+			<Stack.Screen name="success" />
+			<Stack.Screen name="(auth)" options={{ presentation: "modal" }} />
+		</Stack>
+	);
 }
 
-// Componente principal
 export default function RootLayout() {
-  return (
-    <Provider store={store}>
-      <PersistGate loading={<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5f5f5' }}><ActivityIndicator size="large" color="#00A86B" /><Text style={{ marginTop: 16, color: '#333', fontSize: 16 }}>Cargando datos locales...</Text></View>} persistor={persistor}>
-        <AuthWrapper />
-        <Snackbar />
-      </PersistGate>
-    </Provider>
-  )
+	return (
+		<Provider store={store}>
+			<PersistGate
+				loading={
+					<View
+						style={{
+							flex: 1,
+							justifyContent: "center",
+							alignItems: "center",
+							backgroundColor: "#f5f5f5",
+						}}
+					>
+						<ActivityIndicator size="large" color="#00A86B" />
+						<Text style={{ marginTop: 16, color: "#333", fontSize: 16 }}>
+							Cargando datos locales...
+						</Text>
+					</View>
+				}
+				persistor={persistor}
+			>
+				<AuthWrapper />
+				<Snackbar />
+			</PersistGate>
+		</Provider>
+	);
 }
-
