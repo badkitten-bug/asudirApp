@@ -6,6 +6,8 @@ interface UserState {
   imei: string;
   otpSent: boolean;
   otpVerified: boolean;
+  address: string;
+  f1: string;
 }
 
 const initialState: UserState = {
@@ -14,6 +16,8 @@ const initialState: UserState = {
   imei: '',
   otpSent: false,
   otpVerified: false,
+  address: '',
+  f1: '',
 };
 
 export const userSlice = createSlice({
@@ -31,9 +35,13 @@ export const userSlice = createSlice({
     setOTPVerified: (state, action: PayloadAction<boolean>) => {
       state.otpVerified = action.payload;
     },
+    setAccountData: (state, action: PayloadAction<{ address: string; f1: string }>) => {
+      state.address = action.payload.address;
+      state.f1 = action.payload.f1;
+    },
     resetUser: () => initialState,
   },
 });
 
-export const { setPersonalData, setOTPSent, setOTPVerified, resetUser } = userSlice.actions;
+export const { setPersonalData, setOTPSent, setOTPVerified, setAccountData, resetUser } = userSlice.actions;
 export default userSlice.reducer;

@@ -42,6 +42,7 @@ export default function PersonalDataScreen() {
 		try {
 			// Obtener IMEI del dispositivo
 			const imei = await getDeviceIMEI();
+			console.log('IMEI obtenido:', imei);
 			
 			// Guardar datos en Redux
 			dispatch(setPersonalData({
@@ -50,26 +51,40 @@ export default function PersonalDataScreen() {
 				imei: imei
 			}));
 			
+			console.log('Enviando OTP...', { email: email.trim(), dni: dni.trim(), imei });
+			
 			// Enviar OTP
-			await sendOTP({
+			const response = await sendOTP({
 				email: email.trim(),
 				dni: dni.trim(),
 				imei: imei
 			});
 
+			console.log('Respuesta del API:', response);
+
 			// Marcar OTP como enviado
 			dispatch(setOTPSent(true));
 
+			// Navegar directamente sin alerta para probar
+			console.log('Navegando directamente a activation-code...');
+			router.push("/activation-code");
+			
+			// Comentado temporalmente para probar navegación directa
+			/*
 			Alert.alert(
 				"Código enviado", 
 				"Se ha enviado un código de verificación a tu email. Por favor revisa tu bandeja de entrada.",
 				[
 					{
 						text: "Continuar",
-						onPress: () => router.push("/activation-code")
+						onPress: () => {
+							console.log('Navegando a activation-code...');
+							router.push("/activation-code");
+						}
 					}
 				]
 			);
+			*/
 		} catch (error) {
 			console.error('Error sending OTP:', error);
 			Alert.alert(

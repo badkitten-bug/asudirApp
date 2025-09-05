@@ -1,12 +1,19 @@
 "use client";
 import { useState, useRef } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Image, type ImageSourcePropType } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Image, type ImageSourcePropType, Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { createAccount } from "@/services/api";
+import { useDispatch, useSelector } from "@/store";
+import { setOTPVerified, setAccountData } from "@/store/userSlice";
+import LoadingButton from "@/components/LoadingButton";
 
 export default function ActivationCodeScreen() {
 	const router = useRouter();
+	const dispatch = useDispatch();
+	const { email, imei } = useSelector((state) => state.user);
 	const [code, setCode] = useState(["", "", "", "", "", ""]);
+	const [isLoading, setIsLoading] = useState(false);
 	const inputRefs = useRef<(TextInput | null)[]>([]);
 
 	const bg: ImageSourcePropType = require("@/assets/images/identify.png");
@@ -33,9 +40,94 @@ export default function ActivationCodeScreen() {
 		}
 	};
 
-	const handleVerify = () => {
-		if (code.every(digit => digit !== "")) {
-			router.push("/qr-display");
+	const handleVerify = async () => {
+		if (!code.every(digit => digit !== "")) {
+			Alert.alert("Error", "Por favor complete todos los dígitos del código");
+			return;
+		}
+
+		if (!email || !imei) {
+			Alert.alert("Error", "Datos de usuario no encontrados. Por favor regrese a la pantalla anterior.");
+			return;
+		}
+
+		setIsLoading(true);
+
+		try {
+			const otpCode = code.join('');
+			console.log('=== INICIANDO VERIFICACIÓN ===');
+			console.log('Verificando OTP:', { email, otp: otpCode, imei });
+
+			const response = await createAccount({
+				email,
+				otp: otpCode,
+				imei
+			});
+
+			console.log('=== RESPUESTA RECIBIDA ===');
+			console.log('Respuesta completa:', response);
+			console.log('response.response:', response.response);
+			console.log('isValid value:', response.response?.isValid);
+			console.log('isValid type:', typeof response.response?.isValid);
+
+			// Verificar si el OTP es válido
+			console.log('=== VERIFICANDO VALIDEZ ===');
+			const isValid = response.response?.isValid === 'true' || response.response?.isValid === true;
+			console.log('isValid result:', isValid);
+			
+			if (isValid) {
+				console.log('=== OTP VÁLIDO - PROCESANDO ÉXITO ===');
+				
+				// Guardar datos de la cuenta
+				console.log('Guardando datos de cuenta...');
+				dispatch(setAccountData({
+					address: response.response.address,
+					f1: response.response.f1
+				}));
+				console.log('Datos guardados:', { address: response.response.address, f1: response.response.f1 });
+
+				// Marcar OTP como verificado
+				console.log('Marcando OTP como verificado...');
+				dispatch(setOTPVerified(true));
+				console.log('OTP marcado como verificado');
+
+				// Navegar directamente sin alerta para probar
+				console.log('Navegando directamente a qr-display...');
+				router.push("/qr-display");
+				
+				// Comentado temporalmente para probar navegación directa
+				/*
+				Alert.alert(
+					"¡Cuenta creada exitosamente!",
+					"Tu identidad digital está lista. Ahora puedes continuar con el proceso de verificación.",
+					[
+						{
+							text: "Continuar",
+							onPress: () => router.push("/qr-display")
+						}
+					]
+				);
+				*/
+			} else {
+				console.log('=== OTP INVÁLIDO ===');
+				console.log('Mostrando alerta de código inválido');
+				Alert.alert(
+					"Código inválido",
+					"El código OTP ingresado no es válido. Por favor verifica el código y intenta nuevamente.",
+					[{ text: "OK" }]
+				);
+			}
+		} catch (error) {
+			console.log('=== ERROR EN VERIFICACIÓN ===');
+			console.error('Error verifying OTP:', error);
+			Alert.alert(
+				"Error",
+				"No se pudo verificar el código. Por favor intenta nuevamente.",
+				[{ text: "OK" }]
+			);
+		} finally {
+			console.log('=== FINALIZANDO VERIFICACIÓN ===');
+			setIsLoading(false);
 		}
 	};
 
@@ -72,13 +164,15 @@ export default function ActivationCodeScreen() {
 					))}
 				</View>
 
-				<TouchableOpacity 
-					style={[styles.button, !code.every(digit => digit !== "") && styles.buttonDisabled]} 
+				<LoadingButton
 					onPress={handleVerify}
 					disabled={!code.every(digit => digit !== "")}
-				>
-					<Text style={styles.buttonText}>Verificar</Text>
-				</TouchableOpacity>
+					loading={isLoading}
+					title="Verificar"
+					loadingTitle="Verificando código..."
+					style={styles.button}
+					textStyle={styles.buttonText}
+				/>
 			</View>
 		</View>
 	);
