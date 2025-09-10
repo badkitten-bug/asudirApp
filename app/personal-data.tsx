@@ -108,7 +108,7 @@ export default function PersonalDataScreen() {
 				<View style={styles.modalHeader}>
 					<Text style={styles.modalTitle}>Ingrese sus datos personales</Text>
 					<TouchableOpacity onPress={() => router.back()}>
-						<Ionicons name="close" size={24} color="#333" />
+						<Text style={{ fontSize: 24 }}>✕</Text>
 					</TouchableOpacity>
 				</View>
 

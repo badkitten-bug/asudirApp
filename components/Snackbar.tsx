@@ -115,7 +115,7 @@ export default function Snackbar() {
 				<Text style={styles.message}>{message}</Text>
 			</View>
 			<TouchableOpacity onPress={handleHide} style={styles.closeButton}>
-				<Ionicons name="close" size={20} color="white" />
+				<Text style={{ fontSize: 20 }}>✕</Text>
 			</TouchableOpacity>
 		</Animated.View>
 	);

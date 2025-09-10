@@ -20,7 +20,7 @@ const Checkbox: React.FC<CheckboxProps> = ({
 	return (
 		<TouchableOpacity onPress={onPress} style={[styles.container, style]} activeOpacity={0.7}>
 			<View style={[styles.box, { borderColor: color, width: size, height: size }]}>
-				{checked && <Ionicons name="checkmark" size={size * 0.8} color={color} />}
+				{checked && <Text style={{ fontSize: size * 0.8 }}>✅</Text>}
 			</View>
 		</TouchableOpacity>
 	);

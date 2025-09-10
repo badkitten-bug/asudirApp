@@ -54,7 +54,7 @@ export default function OtpVerificationScreen() {
 					<View style={styles.sheetHeader}>
 						<Text style={styles.title}>Ingrese código de activación que se le ha enviado a su correo electrónico</Text>
 						<TouchableOpacity onPress={() => router.back()}>
-							<Ionicons name="close" size={20} color="#3b3b3b" />
+							<Text style={{ fontSize: 20 }}>✕</Text>
 						</TouchableOpacity>
 					</View>
 

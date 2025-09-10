@@ -1,7 +1,6 @@
 "use client";
 import { View, Text, StyleSheet, TouchableOpacity, Image, type ImageSourcePropType } from "react-native";
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 
 export default function SuccessScreen() {
 	const router = useRouter();
@@ -21,13 +20,13 @@ export default function SuccessScreen() {
 				<View style={styles.modalHeader}>
 					<Text style={styles.entity}>Banco Tu Dinero SAC</Text>
 					<TouchableOpacity onPress={() => router.replace("/splash")}>
-						<Ionicons name="close" size={20} color="#3b3b3b" />
+						<Text style={{ fontSize: 20 }}>✕</Text>
 					</TouchableOpacity>
 				</View>
 				
 				<View style={styles.successContainer}>
 					<View style={styles.successIcon}>
-						<Ionicons name="checkmark" size={32} color="white" />
+						<Text style={{ fontSize: 32 }}>✅</Text>
 					</View>
 					<Text style={styles.title}>Datos presentados correctamente</Text>
 				</View>
@@ -45,7 +44,7 @@ const styles = StyleSheet.create({
 	logo: { 
 		width: 160, 
 		height: 80, 
-		marginTop: 24 
+		marginTop: 50 
 	},
 	heroWrap: { 
 		width: "86%", 
@@ -75,6 +74,7 @@ const styles = StyleSheet.create({
 		borderTopLeftRadius: 24,
 		borderTopRightRadius: 24,
 		padding: 24,
+		paddingBottom: 40,
 		minHeight: 200,
 	},
 	modalHeader: {

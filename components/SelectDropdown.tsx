@@ -124,10 +124,10 @@ const SelectDropdown: React.FC<SelectDropdownProps> = ({
 							style={styles.cameraButton}
 							onPress={handleCameraPress}
 						>
-							<Ionicons name="camera-outline" size={20} color="#666" />
+							<Text style={{ fontSize: 20 }}>📷</Text>
 						</TouchableOpacity>
 					)}
-					<Ionicons name="chevron-down" size={20} color="#666" />
+					<Text style={{ fontSize: 20 }}>⌄</Text>
 				</View>
 			</TouchableOpacity>
 

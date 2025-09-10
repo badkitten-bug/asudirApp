@@ -1,7 +1,6 @@
 "use client";
 import { View, Text, StyleSheet, TouchableOpacity, Image, type ImageSourcePropType } from "react-native";
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 
 export default function QRDisplayScreen() {
 	const router = useRouter();
@@ -44,7 +43,7 @@ const styles = StyleSheet.create({
 	logo: { 
 		width: 160, 
 		height: 80, 
-		marginTop: 24 
+		marginTop: 50 
 	},
 	heroWrap: { 
 		width: "86%", 

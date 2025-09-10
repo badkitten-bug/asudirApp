@@ -1,47 +1,26 @@
 "use client";
-import { useState, useRef } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Image, type ImageSourcePropType, Alert } from "react-native";
+import { useState } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, Image, type ImageSourcePropType, Alert } from "react-native";
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 import { createAccount } from "@/services/api";
 import { useDispatch, useSelector } from "@/store";
 import { setOTPVerified, setAccountData } from "@/store/userSlice";
 import LoadingButton from "@/components/LoadingButton";
+import { CodeField, Cursor, useClearByFocusCell } from "react-native-confirmation-code-field";
 
 export default function ActivationCodeScreen() {
 	const router = useRouter();
 	const dispatch = useDispatch();
 	const { email, imei } = useSelector((state) => state.user);
-	const [code, setCode] = useState(["", "", "", "", "", ""]);
+	const [otpCode, setOtpCode] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
-	const inputRefs = useRef<(TextInput | null)[]>([]);
+	const [props, getCellOnLayoutHandler] = useClearByFocusCell({ value: otpCode, setValue: setOtpCode });
 
 	const bg: ImageSourcePropType = require("@/assets/images/identify.png");
 	const logo: ImageSourcePropType = require("@/assets/images/icon.png");
 
-	const handleCodeChange = (value: string, index: number) => {
-		// Solo permitir números
-		const numericValue = value.replace(/[^0-9]/g, '');
-		
-		const newCode = [...code];
-		newCode[index] = numericValue;
-		setCode(newCode);
-
-		// Auto-focus next input si se ingresó un dígito
-		if (numericValue && index < 5) {
-			inputRefs.current[index + 1]?.focus();
-		}
-	};
-
-	const handleKeyPress = (key: string, index: number) => {
-		// Si se presiona backspace y el campo está vacío, ir al anterior
-		if (key === 'Backspace' && code[index] === '' && index > 0) {
-			inputRefs.current[index - 1]?.focus();
-		}
-	};
-
 	const handleVerify = async () => {
-		if (!code.every(digit => digit !== "")) {
+		if (otpCode.length !== 6) {
 			Alert.alert("Error", "Por favor complete todos los dígitos del código");
 			return;
 		}
@@ -54,7 +33,6 @@ export default function ActivationCodeScreen() {
 		setIsLoading(true);
 
 		try {
-			const otpCode = code.join('');
 			console.log('=== INICIANDO VERIFICACIÓN ===');
 			console.log('Verificando OTP:', { email, otp: otpCode, imei });
 
@@ -66,14 +44,23 @@ export default function ActivationCodeScreen() {
 
 			console.log('=== RESPUESTA RECIBIDA ===');
 			console.log('Respuesta completa:', response);
-			console.log('response.response:', response.response);
-			console.log('isValid value:', response.response?.isValid);
-			console.log('isValid type:', typeof response.response?.isValid);
+			console.log('response.isValid:', response.isValid);
+			console.log('response.code:', response.code);
+			console.log('response.message:', response.message);
 
 			// Verificar si el OTP es válido
 			console.log('=== VERIFICANDO VALIDEZ ===');
-			const isValid = response.response?.isValid === 'true' || response.response?.isValid === true;
+			// Verificar si el código es válido - múltiples formas de validar
+			const isValid = response.code === 200 && (
+				response.isValid === 'true' || 
+				response.isValid === true ||
+				response.message === 'ok' ||
+				response.address // Si tiene address, es válido
+			);
 			console.log('isValid result:', isValid);
+			console.log('Response code check:', response.code === 200);
+			console.log('isValid check:', response.isValid === 'true');
+			console.log('hasAddress check:', !!response.address);
 			
 			if (isValid) {
 				console.log('=== OTP VÁLIDO - PROCESANDO ÉXITO ===');
@@ -81,10 +68,10 @@ export default function ActivationCodeScreen() {
 				// Guardar datos de la cuenta
 				console.log('Guardando datos de cuenta...');
 				dispatch(setAccountData({
-					address: response.response.address,
-					f1: response.response.f1
+					address: response.address,
+					f1: response.f1
 				}));
-				console.log('Datos guardados:', { address: response.response.address, f1: response.response.f1 });
+				console.log('Datos guardados:', { address: response.address, f1: response.f1 });
 
 				// Marcar OTP como verificado
 				console.log('Marcando OTP como verificado...');
@@ -94,20 +81,6 @@ export default function ActivationCodeScreen() {
 				// Navegar directamente sin alerta para probar
 				console.log('Navegando directamente a qr-display...');
 				router.push("/qr-display");
-				
-				// Comentado temporalmente para probar navegación directa
-				/*
-				Alert.alert(
-					"¡Cuenta creada exitosamente!",
-					"Tu identidad digital está lista. Ahora puedes continuar con el proceso de verificación.",
-					[
-						{
-							text: "Continuar",
-							onPress: () => router.push("/qr-display")
-						}
-					]
-				);
-				*/
 			} else {
 				console.log('=== OTP INVÁLIDO ===');
 				console.log('Mostrando alerta de código inválido');
@@ -142,31 +115,33 @@ export default function ActivationCodeScreen() {
 				<View style={styles.modalHeader}>
 					<Text style={styles.modalTitle}>Ingrese el código de 6 dígitos que se le ha enviado a su correo electrónico</Text>
 					<TouchableOpacity onPress={() => router.back()}>
-						<Ionicons name="close" size={24} color="#333" />
+						<Text style={{ fontSize: 24 }}>✕</Text>
 					</TouchableOpacity>
 				</View>
 
 				<View style={styles.codeContainer}>
-					{code.map((digit, index) => (
-						<TextInput
-							key={`code-input-${index}`}
-							ref={(ref) => (inputRefs.current[index] = ref)}
-							style={styles.codeInput}
-							value={digit}
-							onChangeText={(value) => handleCodeChange(value, index)}
-							onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, index)}
-							keyboardType="numeric"
-							maxLength={1}
-							textAlign="center"
-							autoFocus={index === 0}
-							selectTextOnFocus
-						/>
-					))}
+					<CodeField
+						{...props}
+						value={otpCode}
+						onChangeText={setOtpCode}
+						cellCount={6}
+						keyboardType="number-pad"
+						textContentType="oneTimeCode"
+						renderCell={({ index, symbol, isFocused }) => (
+							<Text
+								key={index}
+								style={[styles.cell, isFocused && styles.focusCell]}
+								onLayout={getCellOnLayoutHandler(index)}
+							>
+								{symbol || (isFocused ? <Cursor /> : null)}
+							</Text>
+						)}
+					/>
 				</View>
 
 				<LoadingButton
 					onPress={handleVerify}
-					disabled={!code.every(digit => digit !== "")}
+					disabled={otpCode.length !== 6}
 					loading={isLoading}
 					title="Verificar"
 					loadingTitle="Verificando código..."
@@ -219,27 +194,27 @@ const styles = StyleSheet.create({
 	modalTitle: { 
 		fontSize: 16, 
 		fontWeight: "600", 
-		color: "#333", 
+		color: "#666", 
 		flex: 1, 
 		marginRight: 16 
 	},
 	codeContainer: { 
-		flexDirection: "row", 
-		justifyContent: "space-between", 
 		marginBottom: 30,
-		flexWrap: "wrap",
-		gap: 8,
+		alignItems: "center",
 	},
-	codeInput: { 
-		width: 50, 
-		height: 60, 
-		borderWidth: 2, 
-		borderColor: "#E3F2FD", 
-		borderRadius: 8, 
-		fontSize: 20, 
-		fontWeight: "600", 
+	cell: {
+		width: 50,
+		height: 60,
+		lineHeight: 56,
+		fontSize: 20,
+		fontWeight: "600",
+		borderWidth: 2,
+		borderColor: "#E3F2FD",
+		textAlign: "center",
+		borderRadius: 8,
 		color: "#333",
 		backgroundColor: "#fff",
+		marginHorizontal: 4,
 		shadowColor: "#000",
 		shadowOffset: {
 			width: 0,
@@ -248,6 +223,9 @@ const styles = StyleSheet.create({
 		shadowOpacity: 0.1,
 		shadowRadius: 3.84,
 		elevation: 5,
+	},
+	focusCell: {
+		borderColor: "#1E78C6",
 	},
 	button: { 
 		backgroundColor: "#1E78C6", 

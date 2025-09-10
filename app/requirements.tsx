@@ -1,7 +1,6 @@
 "use client";
 import { View, Text, StyleSheet, TouchableOpacity, Image, Platform, type ImageSourcePropType } from "react-native";
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 
 export default function RequirementsScreen() {
 	const router = useRouter();
@@ -22,21 +21,21 @@ export default function RequirementsScreen() {
 				<View style={styles.modalHeader}>
 					<Text style={styles.entity}>Banco Tu Dinero SAC</Text>
 					<TouchableOpacity onPress={() => router.back()}>
-						<Ionicons name="close" size={20} color="#3b3b3b" />
+						<Text style={{ fontSize: 20 }}>✕</Text>
 					</TouchableOpacity>
 				</View>
 				<Text style={styles.subtitle}>Está solicitando que le presentes esta información:</Text>
 
 				<View style={styles.itemRow}>
-					<Ionicons name="checkmark-circle" size={18} color="#1E78C6" />
+					<Text style={{ fontSize: 18 }}>⏳</Text>
 					<Text style={styles.itemText}>Verificación biométrica</Text>
 				</View>
 				<View style={styles.itemRow}>
-					<Ionicons name="checkmark-circle" size={18} color="#1E78C6" />
+					<Text style={{ fontSize: 18 }}>✅</Text>
 					<Text style={styles.itemText}>Número de documento de identidad</Text>
 				</View>
 				<View style={styles.itemRow}>
-					<Ionicons name="checkmark-circle" size={18} color="#1E78C6" />
+					<Text style={{ fontSize: 18 }}>✅</Text>
 					<Text style={styles.itemText}>Email</Text>
 				</View>
 
@@ -52,12 +51,13 @@ const styles = StyleSheet.create({
 	container: { 
 		flex: 1, 
 		backgroundColor: "#fff", 
-		alignItems: "center" 
+		alignItems: "center",
+		paddingHorizontal: 24
 	},
 	logo: { 
 		width: 160, 
 		height: 80, 
-		marginTop: 24 
+		marginTop: 50 
 	},
 	heroWrap: { 
 		width: "86%", 
@@ -87,6 +87,7 @@ const styles = StyleSheet.create({
 		borderTopLeftRadius: 24, 
 		borderTopRightRadius: 24, 
 		padding: 24,
+		paddingBottom: 40,
 		...(Platform.OS === 'web' ? { boxShadow: "0px 8px 24px rgba(0,0,0,0.15)" } : { shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 6 })
 	},
 	modalHeader: { 

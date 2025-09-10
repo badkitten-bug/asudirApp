@@ -68,7 +68,7 @@ export default function ControlPanel() {
 				contentContainerStyle={styles.contentContainer}
 			>
 				<TouchableOpacity style={styles.scanQRButton} onPress={handleScanQR}>
-					<Ionicons name="qr-code-outline" size={20} color="#fff" />
+					<Text style={{ fontSize: 20 }}>📱</Text>
 					<Text style={styles.scanQRText}>Escanear QR</Text>
 				</TouchableOpacity>
 
@@ -76,14 +76,14 @@ export default function ControlPanel() {
 					style={styles.presentIdentityButton}
 					onPress={handlePresentIdentity}
 				>
-					<Ionicons name="person-outline" size={20} color="#fff" />
+					<Text style={{ fontSize: 20 }}>👤</Text>
 					<Text style={styles.presentIdentityText}>Presentar Identidad</Text>
 				</TouchableOpacity>
 
 				<View style={styles.card}>
 					<View style={styles.cardHeader}>
 						<Text style={styles.cardTitle}>Estado de Verificación</Text>
-						<Ionicons name="checkmark-circle-outline" size={24} color="#000" />
+						<Text style={{ fontSize: 24 }}>✅</Text>
 					</View>
 					<Text style={[styles.cardValue, styles.verifiedValue]}>
 						Verificado
@@ -94,7 +94,7 @@ export default function ControlPanel() {
 				<View style={styles.card}>
 					<View style={styles.cardHeader}>
 						<Text style={styles.cardTitle}>Verificaciones Recientes</Text>
-						<Ionicons name="time-outline" size={24} color="#000" />
+						<Text style={{ fontSize: 24 }}>⏰</Text>
 					</View>
 					<Text style={[styles.cardValue, styles.recentValue]}>0</Text>
 					<Text style={styles.cardSubtitle}>Verificaciones este mes</Text>

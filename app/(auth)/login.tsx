@@ -132,7 +132,7 @@ export default function LoginScreen() {
 						<Animated.View style={[styles.sheet, { transform: [{ translateY: panelY }] }]}>
 							<View style={styles.sheetHeader}>
 								<Text style={styles.sheetTitle}>Ingrese sus datos personales</Text>
-								<TouchableOpacity onPress={hidePanel}><Ionicons name="close" size={20} color="#3b3b3b" /></TouchableOpacity>
+								<TouchableOpacity onPress={hidePanel}><Text style={{ fontSize: 20 }}>✕</Text></TouchableOpacity>
 							</View>
 
 							<View style={styles.inputGroup}>
