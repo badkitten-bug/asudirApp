@@ -1,6 +1,15 @@
 "use client";
 import { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Image, type ImageSourcePropType, Alert } from "react-native";
+import {
+	View,
+	Text,
+	StyleSheet,
+	TouchableOpacity,
+	TextInput,
+	Image,
+	type ImageSourcePropType,
+	Alert,
+} from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { sendOTP, getDeviceIMEI } from "@/services/api";
@@ -42,33 +51,39 @@ export default function PersonalDataScreen() {
 		try {
 			// Obtener IMEI del dispositivo
 			const imei = await getDeviceIMEI();
-			console.log('IMEI obtenido:', imei);
-			
+			console.log("IMEI obtenido:", imei);
+
 			// Guardar datos en Redux
-			dispatch(setPersonalData({
-				dni: dni.trim(),
+			dispatch(
+				setPersonalData({
+					dni: dni.trim(),
+					email: email.trim(),
+					imei: imei,
+				}),
+			);
+
+			console.log("Enviando OTP...", {
 				email: email.trim(),
-				imei: imei
-			}));
-			
-			console.log('Enviando OTP...', { email: email.trim(), dni: dni.trim(), imei });
-			
+				dni: dni.trim(),
+				imei,
+			});
+
 			// Enviar OTP
 			const response = await sendOTP({
 				email: email.trim(),
 				dni: dni.trim(),
-				imei: imei
+				imei: imei,
 			});
 
-			console.log('Respuesta del API:', response);
+			console.log("Respuesta del API:", response);
 
 			// Marcar OTP como enviado
 			dispatch(setOTPSent(true));
 
 			// Navegar directamente sin alerta para probar
-			console.log('Navegando directamente a activation-code...');
+			console.log("Navegando directamente a activation-code...");
 			router.push("/activation-code");
-			
+
 			// Comentado temporalmente para probar navegación directa
 			/*
 			Alert.alert(
@@ -86,11 +101,11 @@ export default function PersonalDataScreen() {
 			);
 			*/
 		} catch (error) {
-			console.error('Error sending OTP:', error);
+			console.error("Error sending OTP:", error);
 			Alert.alert(
-				"Error", 
+				"Error",
 				"No se pudo enviar el código de verificación. Por favor intenta nuevamente.",
-				[{ text: "OK" }]
+				[{ text: "OK" }],
 			);
 		} finally {
 			setIsLoading(false);
@@ -150,79 +165,79 @@ export default function PersonalDataScreen() {
 }
 
 const styles = StyleSheet.create({
-	container: { 
-		flex: 1, 
-		backgroundColor: "#fff", 
-		alignItems: "center" 
+	container: {
+		flex: 1,
+		backgroundColor: "#fff",
+		alignItems: "center",
 	},
-	logo: { 
-		width: 160, 
-		height: 80, 
-		marginTop: 24 
+	logo: {
+		width: 160,
+		height: 80,
+		marginTop: 24,
 	},
-	heroWrap: { 
-		width: "86%", 
-		height: 280, 
-		marginTop: 12, 
-		position: "relative" 
+	heroWrap: {
+		width: "86%",
+		height: 280,
+		marginTop: 12,
+		position: "relative",
 	},
-	hero: { 
-		width: "100%", 
-		height: "100%" 
+	hero: {
+		width: "100%",
+		height: "100%",
 	},
-	modal: { 
-		position: "absolute", 
-		left: 0, 
-		right: 0, 
-		bottom: 0, 
-		backgroundColor: "#fff", 
-		borderTopLeftRadius: 24, 
-		borderTopRightRadius: 24, 
+	modal: {
+		position: "absolute",
+		left: 0,
+		right: 0,
+		bottom: 0,
+		backgroundColor: "#fff",
+		borderTopLeftRadius: 24,
+		borderTopRightRadius: 24,
 		padding: 24,
 		minHeight: 300,
 	},
-	modalHeader: { 
-		flexDirection: "row", 
-		justifyContent: "space-between", 
-		alignItems: "center", 
-		marginBottom: 20 
+	modalHeader: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		marginBottom: 20,
 	},
-	modalTitle: { 
-		fontSize: 18, 
-		fontWeight: "600", 
-		color: "#333" 
+	modalTitle: {
+		fontSize: 18,
+		fontWeight: "600",
+		color: "#333",
 	},
-	inputContainer: { 
-		marginBottom: 20 
+	inputContainer: {
+		marginBottom: 20,
 	},
-	inputLabel: { 
-		fontSize: 16, 
-		fontWeight: "500", 
-		color: "#333", 
-		marginBottom: 8 
+	inputLabel: {
+		fontSize: 16,
+		fontWeight: "500",
+		color: "#333",
+		marginBottom: 8,
 	},
-	input: { 
-		borderWidth: 2, 
-		borderColor: "#E3F2FD", 
-		borderRadius: 8, 
-		paddingHorizontal: 16, 
-		paddingVertical: 12, 
-		fontSize: 16, 
-		color: "#333" 
+	input: {
+		borderWidth: 2,
+		borderColor: "#E3F2FD",
+		borderRadius: 8,
+		paddingHorizontal: 16,
+		paddingVertical: 12,
+		fontSize: 16,
+		color: "#333",
 	},
-	button: { 
-		backgroundColor: "#1E78C6", 
-		paddingVertical: 16, 
-		borderRadius: 8, 
-		marginTop: 10 
+	button: {
+		backgroundColor: "#1E78C6",
+		paddingVertical: 16,
+		borderRadius: 8,
+		marginTop: 10,
 	},
-	buttonDisabled: { 
-		backgroundColor: "#ccc" 
+	buttonDisabled: {
+		backgroundColor: "#ccc",
 	},
-	buttonText: { 
-		color: "#fff", 
-		fontSize: 16, 
-		fontWeight: "600", 
-		textAlign: "center" 
+	buttonText: {
+		color: "#fff",
+		fontSize: 16,
+		fontWeight: "600",
+		textAlign: "center",
 	},
 });

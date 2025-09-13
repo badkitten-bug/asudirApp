@@ -45,7 +45,7 @@ export default function LoginScreen() {
 	const { isAuthenticated } = useSelector((state: RootState) => state.auth);
 
 	useEffect(() => {
-		if (isAuthenticated) router.replace("/(tabs)");
+		if (isAuthenticated) router.replace("/qr-scanner");
 	}, [isAuthenticated, router]);
 
 	useEffect(() => {
@@ -54,8 +54,15 @@ export default function LoginScreen() {
 			(e) => {
 				setKeyboardVisible(true);
 				setKeyboardHeight(e.endCoordinates.height);
-				Animated.timing(formPositionY, { toValue: -Math.min(150, e.endCoordinates.height * 0.4), duration: 300, useNativeDriver: true }).start();
-				if (scrollViewRef.current) setTimeout(() => { scrollViewRef.current?.scrollToEnd({ animated: true }) }, 100);
+				Animated.timing(formPositionY, {
+					toValue: -Math.min(150, e.endCoordinates.height * 0.4),
+					duration: 300,
+					useNativeDriver: true,
+				}).start();
+				if (scrollViewRef.current)
+					setTimeout(() => {
+						scrollViewRef.current?.scrollToEnd({ animated: true });
+					}, 100);
 			},
 		);
 
@@ -64,24 +71,45 @@ export default function LoginScreen() {
 			() => {
 				setKeyboardVisible(false);
 				setKeyboardHeight(0);
-				Animated.timing(formPositionY, { toValue: 0, duration: 300, useNativeDriver: true }).start();
+				Animated.timing(formPositionY, {
+					toValue: 0,
+					duration: 300,
+					useNativeDriver: true,
+				}).start();
 			},
 		);
 
-		return () => { keyboardWillShowListener.remove(); keyboardWillHideListener.remove() };
+		return () => {
+			keyboardWillShowListener.remove();
+			keyboardWillHideListener.remove();
+		};
 	}, [formPositionY]);
 
 	const showPanel = () => {
-		Animated.timing(panelY, { toValue: 0, duration: 300, useNativeDriver: true }).start();
+		Animated.timing(panelY, {
+			toValue: 0,
+			duration: 300,
+			useNativeDriver: true,
+		}).start();
 	};
 
 	const hidePanel = () => {
-		Animated.timing(panelY, { toValue: SCREEN_HEIGHT, duration: 250, useNativeDriver: true }).start();
+		Animated.timing(panelY, {
+			toValue: SCREEN_HEIGHT,
+			duration: 250,
+			useNativeDriver: true,
+		}).start();
 	};
 
 	const handleStart = () => {
 		if (!accepted) {
-			dispatch(showSnackbar({ message: "Debes aceptar términos y condiciones", type: "warning", duration: 2500 }));
+			dispatch(
+				showSnackbar({
+					message: "Debes aceptar términos y condiciones",
+					type: "warning",
+					duration: 2500,
+				}),
+			);
 			return;
 		}
 		showPanel();
@@ -89,10 +117,30 @@ export default function LoginScreen() {
 
 	const handleVerify = () => {
 		if (!dni.trim() || !email.trim()) {
-			dispatch(showSnackbar({ message: "Completa DNI y correo", type: "warning", duration: 2500 }));
+			dispatch(
+				showSnackbar({
+					message: "Completa DNI y correo",
+					type: "warning",
+					duration: 2500,
+				}),
+			);
 			return;
 		}
-		router.push("/(auth)/otp-verification");
+
+		// Para login, vamos directo al scanner (simulando login exitoso)
+		// En una implementación real, aquí validarías las credenciales
+		dispatch(
+			showSnackbar({
+				message: "Login exitoso",
+				type: "success",
+				duration: 2000,
+			}),
+		);
+
+		// Simular login exitoso
+		setTimeout(() => {
+			router.replace("/qr-scanner");
+		}, 1000);
 	};
 
 	const dismissKeyboard = () => Keyboard.dismiss();
@@ -103,7 +151,11 @@ export default function LoginScreen() {
 
 	return (
 		<View style={styles.container}>
-			<RNStatusBar backgroundColor="transparent" barStyle="dark-content" translucent={true} />
+			<RNStatusBar
+				backgroundColor="transparent"
+				barStyle="dark-content"
+				translucent={true}
+			/>
 			<StatusBar style="dark" />
 
 			<TouchableWithoutFeedback onPress={dismissKeyboard}>
@@ -113,12 +165,21 @@ export default function LoginScreen() {
 					<Image source={logo} style={styles.logo} resizeMode="contain" />
 					<View style={styles.heroWrap}>
 						<Image source={bg} style={styles.hero} resizeMode="contain" />
-						<Image source={identify} style={styles.identify} resizeMode="contain" />
+						<Image
+							source={identify}
+							style={styles.identify}
+							resizeMode="contain"
+						/>
 					</View>
 
 					<View style={styles.tcContainer}>
-						<Text style={styles.tcText}>Por favor, verifique su identidad.</Text>
-						<TouchableOpacity style={styles.tcRow} onPress={() => setAccepted(!accepted)}>
+						<Text style={styles.tcText}>
+							Por favor, verifique su identidad.
+						</Text>
+						<TouchableOpacity
+							style={styles.tcRow}
+							onPress={() => setAccepted(!accepted)}
+						>
 							<View style={[styles.tcCheck, accepted && styles.tcCheckOn]} />
 							<Text style={styles.tcLink}>Acepto términos y condiciones</Text>
 						</TouchableOpacity>
@@ -128,25 +189,60 @@ export default function LoginScreen() {
 						<Text style={styles.primaryText}>Iniciar verificación</Text>
 					</TouchableOpacity>
 
-					<KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.keyboardView}>
-						<Animated.View style={[styles.sheet, { transform: [{ translateY: panelY }] }]}>
+					<KeyboardAvoidingView
+						behavior={Platform.OS === "ios" ? "padding" : "height"}
+						style={styles.keyboardView}
+					>
+						<Animated.View
+							style={[styles.sheet, { transform: [{ translateY: panelY }] }]}
+						>
 							<View style={styles.sheetHeader}>
-								<Text style={styles.sheetTitle}>Ingrese sus datos personales</Text>
-								<TouchableOpacity onPress={hidePanel}><Text style={{ fontSize: 20 }}>✕</Text></TouchableOpacity>
+								<Text style={styles.sheetTitle}>
+									Ingrese sus datos personales
+								</Text>
+								<TouchableOpacity onPress={hidePanel}>
+									<Text style={{ fontSize: 20 }}>✕</Text>
+								</TouchableOpacity>
 							</View>
 
 							<View style={styles.inputGroup}>
 								<Text style={styles.label}>DNI</Text>
-								<TextInput style={styles.input} placeholder="Ingresa tu DNI" keyboardType="numeric" maxLength={8} value={dni} onChangeText={setDni} />
+								<TextInput
+									style={styles.input}
+									placeholder="Ingresa tu DNI"
+									keyboardType="numeric"
+									maxLength={8}
+									value={dni}
+									onChangeText={setDni}
+								/>
 							</View>
 
 							<View style={styles.inputGroup}>
 								<Text style={styles.label}>Email</Text>
-								<TextInput style={styles.input} placeholder="Ingresa tu Email" keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail} />
+								<TextInput
+									style={styles.input}
+									placeholder="Ingresa tu Email"
+									keyboardType="email-address"
+									autoCapitalize="none"
+									value={email}
+									onChangeText={setEmail}
+								/>
 							</View>
 
-							<TouchableOpacity style={styles.primaryBtn} onPress={handleVerify}>
-								<Text style={styles.primaryText}>Verificar</Text>
+							<TouchableOpacity
+								style={styles.primaryBtn}
+								onPress={handleVerify}
+							>
+								<Text style={styles.primaryText}>Iniciar Sesión</Text>
+							</TouchableOpacity>
+
+							<TouchableOpacity
+								style={styles.secondaryBtn}
+								onPress={() => router.push("/verification-start")}
+							>
+								<Text style={styles.secondaryText}>
+									¿No tienes cuenta? Regístrate
+								</Text>
 							</TouchableOpacity>
 						</Animated.View>
 					</KeyboardAvoidingView>
@@ -163,21 +259,85 @@ const styles = StyleSheet.create({
 	logo: { width: 160, height: 80, marginTop: 24 },
 	heroWrap: { width: "86%", height: 280, marginTop: 16, position: "relative" },
 	hero: { width: "100%", height: "100%" },
-	identify: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0, width: "100%", height: "100%" },
+	identify: {
+		position: "absolute",
+		left: 0,
+		right: 0,
+		top: 0,
+		bottom: 0,
+		width: "100%",
+		height: "100%",
+	},
 	tcContainer: { marginTop: 16, alignItems: "center" },
 	tcText: { color: "#6b7280" },
 	tcRow: { flexDirection: "row", alignItems: "center", marginTop: 8 },
-	tcCheck: { width: 18, height: 18, borderRadius: 4, borderWidth: 2, borderColor: "#1E78C6", marginRight: 8 },
+	tcCheck: {
+		width: 18,
+		height: 18,
+		borderRadius: 4,
+		borderWidth: 2,
+		borderColor: "#1E78C6",
+		marginRight: 8,
+	},
 	tcCheckOn: { backgroundColor: "#1E78C6" },
 	tcLink: { color: "#1E78C6" },
-	primaryBtn: { backgroundColor: "#1E78C6", paddingVertical: 12, paddingHorizontal: 18, borderRadius: 10, marginTop: 16 },
-	primaryText: { color: "#fff", fontWeight: "700" },
-	sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 12,
-		...(Platform.OS === 'web' ? { boxShadow: "0px 8px 24px rgba(0,0,0,0.15)" } : { shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 6 })
+	primaryBtn: {
+		backgroundColor: "#1E78C6",
+		paddingVertical: 12,
+		paddingHorizontal: 18,
+		borderRadius: 10,
+		marginTop: 16,
 	},
-	sheetHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+	primaryText: { color: "#fff", fontWeight: "700" },
+	secondaryBtn: {
+		backgroundColor: "transparent",
+		paddingVertical: 12,
+		paddingHorizontal: 20,
+		borderRadius: 20,
+		borderWidth: 1,
+		borderColor: "#1E78C6",
+		marginTop: 12,
+		alignItems: "center",
+	},
+	secondaryText: {
+		color: "#1E78C6",
+		fontSize: 14,
+		fontWeight: "600",
+	},
+	sheet: {
+		position: "absolute",
+		left: 0,
+		right: 0,
+		bottom: 0,
+		backgroundColor: "#fff",
+		borderTopLeftRadius: 24,
+		borderTopRightRadius: 24,
+		padding: 24,
+		gap: 12,
+		...(Platform.OS === "web"
+			? { boxShadow: "0px 8px 24px rgba(0,0,0,0.15)" }
+			: {
+					shadowColor: "#000",
+					shadowOpacity: 0.15,
+					shadowRadius: 12,
+					shadowOffset: { width: 0, height: 6 },
+					elevation: 6,
+				}),
+	},
+	sheetHeader: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		marginBottom: 12,
+	},
 	sheetTitle: { fontSize: 16, fontWeight: "700" },
 	inputGroup: { marginTop: 8 },
 	label: { marginBottom: 6, color: "#374151" },
-	input: { backgroundColor: "#EEF8F7", borderColor: "#cfd8dc", borderWidth: 1, borderRadius: 10, padding: 12 },
+	input: {
+		backgroundColor: "#EEF8F7",
+		borderColor: "#cfd8dc",
+		borderWidth: 1,
+		borderRadius: 10,
+		padding: 12,
+	},
 });

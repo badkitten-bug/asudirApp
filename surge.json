@@ -1,43 +1,43 @@
 {
-  "headers": [
-    {
-      "source": "**/*.ttf",
-      "headers": [
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        },
-        {
-          "key": "Content-Type",
-          "value": "font/ttf"
-        }
-      ]
-    },
-    {
-      "source": "**/*.woff",
-      "headers": [
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        },
-        {
-          "key": "Content-Type",
-          "value": "font/woff"
-        }
-      ]
-    },
-    {
-      "source": "**/*.woff2",
-      "headers": [
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        },
-        {
-          "key": "Content-Type",
-          "value": "font/woff2"
-        }
-      ]
-    }
-  ]
+	"headers": [
+		{
+			"source": "**/*.ttf",
+			"headers": [
+				{
+					"key": "Access-Control-Allow-Origin",
+					"value": "*"
+				},
+				{
+					"key": "Content-Type",
+					"value": "font/ttf"
+				}
+			]
+		},
+		{
+			"source": "**/*.woff",
+			"headers": [
+				{
+					"key": "Access-Control-Allow-Origin",
+					"value": "*"
+				},
+				{
+					"key": "Content-Type",
+					"value": "font/woff"
+				}
+			]
+		},
+		{
+			"source": "**/*.woff2",
+			"headers": [
+				{
+					"key": "Access-Control-Allow-Origin",
+					"value": "*"
+				},
+				{
+					"key": "Content-Type",
+					"value": "font/woff2"
+				}
+			]
+		}
+	]
 }

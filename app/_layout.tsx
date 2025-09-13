@@ -58,11 +58,13 @@ function AuthWrapper() {
 			<Stack.Screen name="verification-start" />
 			<Stack.Screen name="personal-data" />
 			<Stack.Screen name="activation-code" />
-			<Stack.Screen name="qr-display" />
+			<Stack.Screen name="quick-access" />
 			<Stack.Screen name="qr-scanner" />
 			<Stack.Screen name="requirements" />
 			<Stack.Screen name="biometric" />
 			<Stack.Screen name="success" />
+			<Stack.Screen name="otp-generator" />
+			<Stack.Screen name="otp-scanner" />
 			<Stack.Screen name="(auth)" options={{ presentation: "modal" }} />
 		</Stack>
 	);

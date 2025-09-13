@@ -1,113 +1,162 @@
 "use client";
-import { useState, useEffect } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, Image, type ImageSourcePropType, ScrollView } from "react-native";
-import { useRouter } from "expo-router";
+import { useState, useEffect, useCallback } from "react";
 
-interface OTPServer {
-	id: string;
-	name: string;
-	secretKey: string;
-	otpCode: string;
-	timeLeft: number;
-}
+import {
+	View,
+	Text,
+	StyleSheet,
+	TouchableOpacity,
+	Alert,
+	Image,
+	type ImageSourcePropType,
+	ScrollView,
+	Platform,
+} from "react-native";
+import { useRouter, useFocusEffect } from "expo-router";
+import { getStoredOTPCodes, deleteOTPCode, updateOTPCodeStatus, regenerateOTPCode, type StoredOTPCode } from "@/utils/otp-storage";
+
 
 export default function OTPGeneratorScreen() {
 	const router = useRouter();
-	
-	const [servers, setServers] = useState<OTPServer[]>([
-		{
-			id: "1",
-			name: "Servidor XYZ",
-			secretKey: "ACSD-23556-38494",
-			otpCode: "",
-			timeLeft: 30
+	const [storedCodes, setStoredCodes] = useState<StoredOTPCode[]>([]);
+	const [isLoading, setIsLoading] = useState(true);
+
+	const loadStoredCodes = useCallback(async () => {
+		try {
+			setIsLoading(true);
+			const codes = await getStoredOTPCodes();
+			setStoredCodes(codes);
+			console.log(`📱 Códigos cargados: ${codes.length}`);
+		} catch (error) {
+			console.error('❌ Error cargando códigos:', error);
+		} finally {
+			setIsLoading(false);
 		}
-	]);
-	const [searchQuery, setSearchQuery] = useState("");
-	const [showAddModal, setShowAddModal] = useState(false);
-	const [newServerName, setNewServerName] = useState("");
-	const [newSecretKey, setNewSecretKey] = useState("");
+	}, []);
 
-	const logo: ImageSourcePropType = require("@/assets/images/icon.png");
-
-	// Función para generar código OTP basado en TOTP (Time-based One-Time Password)
-	const generateOTP = (secret: string, timeStep: number): string => {
-		if (!secret) return "";
-		
-		// Convertir el tiempo actual a steps de 30 segundos
-		const time = Math.floor(Date.now() / 1000 / timeStep);
-		
-		// Crear un hash simple basado en el secret y el tiempo
-		// En una implementación real usarías HMAC-SHA1
-		const hash = btoa(secret + time.toString()).replace(/\D/g, '');
-		
-		// Tomar los últimos 6 dígitos
-		const otp = hash.slice(-6).padStart(6, '0');
-		return otp;
-	};
-
-	// Timer que se ejecuta cada segundo para todos los servidores
+	// Cargar códigos almacenados al montar el componente
 	useEffect(() => {
-		const updateServers = () => {
-			setServers(prevServers => 
-				prevServers.map(server => {
-					const newTimeLeft = server.timeLeft <= 1 ? 30 : server.timeLeft - 1;
-					const newOtpCode = server.timeLeft <= 1 ? generateOTP(server.secretKey, 30) : server.otpCode;
-					
-					return {
-						...server,
-						timeLeft: newTimeLeft,
-						otpCode: newOtpCode
-					};
-				})
-			);
-		};
+		void loadStoredCodes();
+	}, [loadStoredCodes]);
 
-		const interval = setInterval(updateServers, 1000);
+	// Recargar códigos cuando se regresa del scanner
+	useFocusEffect(
+		useCallback(() => {
+			void loadStoredCodes();
+		}, [loadStoredCodes])
+	);
+
+	// Actualizar tiempo restante cada segundo y regenerar cuando expire
+	useEffect(() => {
+		const interval = setInterval(async () => {
+			const codes = await getStoredOTPCodes();
+			const updatedCodes = [];
+			let needsRegeneration = false;
+			
+			for (const code of codes) {
+				const now = new Date();
+				const expiresAt = new Date(code.expiresAt);
+				const timeLeft = Math.max(0, Math.floor((expiresAt.getTime() - now.getTime()) / 1000));
+				
+				// Si el tiempo llegó a 0, regenerar el código
+				if (timeLeft === 0 && code.isActive) {
+					try {
+						console.log(`🔄 Regenerando código ${code.type.toUpperCase()} expirado:`, code.id);
+						const regeneratedCode = await regenerateOTPCode(code.id);
+						if (regeneratedCode) {
+							updatedCodes.push(regeneratedCode);
+							needsRegeneration = true;
+							continue;
+						}
+					} catch (error) {
+						console.error('❌ Error regenerando código:', error);
+					}
+				}
+				
+				updatedCodes.push({
+					...code,
+					timeLeft,
+					isActive: expiresAt > now,
+				});
+			}
+			
+			// Solo actualizar el estado si hubo cambios
+			if (needsRegeneration) {
+				setStoredCodes(updatedCodes);
+			} else {
+				// Actualizar solo el tiempo restante
+				setStoredCodes(prevCodes => 
+					prevCodes.map(code => {
+						const now = new Date();
+						const expiresAt = new Date(code.expiresAt);
+						const timeLeft = Math.max(0, Math.floor((expiresAt.getTime() - now.getTime()) / 1000));
+						
+						return {
+							...code,
+							timeLeft,
+							isActive: expiresAt > now,
+						};
+					})
+				);
+			}
+		}, 1000);
+
 		return () => clearInterval(interval);
 	}, []);
 
-	// Generar OTP inicial para todos los servidores
-	useEffect(() => {
-		setServers(prevServers => 
-			prevServers.map(server => ({
-				...server,
-				otpCode: generateOTP(server.secretKey, 30)
-			}))
+	const logo: ImageSourcePropType = require("@/assets/images/icon.png");
+
+	// Funciones para manejar códigos almacenados
+	const handleActivateCode = async (codeId: string) => {
+		try {
+			await updateOTPCodeStatus(codeId, true);
+			await loadStoredCodes();
+			Alert.alert("✅ Éxito", "Código activado correctamente");
+		} catch {
+			Alert.alert("❌ Error", "No se pudo activar el código");
+		}
+	};
+
+	const handleApproveCode = async (codeId: string) => {
+		try {
+			await updateOTPCodeStatus(codeId, true);
+			await loadStoredCodes();
+			Alert.alert("✅ Éxito", "Código aprobado correctamente");
+		} catch {
+			Alert.alert("❌ Error", "No se pudo aprobar el código");
+		}
+	};
+
+	const handleDeleteCode = async (codeId: string) => {
+		Alert.alert(
+			"🗑️ Eliminar Código",
+			"¿Estás seguro de que quieres eliminar este código?",
+			[
+				{ text: "Cancelar", style: "cancel" },
+				{
+					text: "Eliminar",
+					style: "destructive",
+					onPress: () => {
+						void (async () => {
+							try {
+								await deleteOTPCode(codeId);
+								await loadStoredCodes();
+								Alert.alert("✅ Éxito", "Código eliminado correctamente");
+							} catch {
+								Alert.alert("❌ Error", "No se pudo eliminar el código");
+							}
+						})();
+					},
+				},
+			]
 		);
-	}, []);
-
-	const handleAddServer = () => {
-		if (!newServerName.trim()) {
-			Alert.alert("Error", "Por favor ingrese un nombre para el servidor");
-			return;
-		}
-		if (!newSecretKey.trim()) {
-			Alert.alert("Error", "Por favor ingrese una semilla");
-			return;
-		}
-		
-		const newServer: OTPServer = {
-			id: Date.now().toString(),
-			name: newServerName.trim(),
-			secretKey: newSecretKey.trim(),
-			otpCode: generateOTP(newSecretKey.trim(), 30),
-			timeLeft: 30
-		};
-		
-		setServers(prevServers => [...prevServers, newServer]);
-		setNewServerName("");
-		setNewSecretKey("");
-		setShowAddModal(false);
 	};
 
-	const copyToClipboard = (otpCode: string, serverName: string) => {
-		Alert.alert("Copiado", `Código OTP de ${serverName}: ${otpCode}`);
+	const handleCopyCode = (code: string) => {
+		// En React Native necesitarías usar una librería como @react-native-clipboard/clipboard
+		Alert.alert("📋 Copiado", `Código copiado: ${code}`);
 	};
 
-	const filteredServers = servers.filter(server => 
-		server.name.toLowerCase().includes(searchQuery.toLowerCase())
-	);
 
 	return (
 		<View style={styles.container}>
@@ -118,107 +167,113 @@ export default function OTPGeneratorScreen() {
 			<View style={styles.content}>
 				<View style={styles.headerActions}>
 					<Text style={styles.title}>Códigos de Autenticación</Text>
-					<TouchableOpacity 
-						style={styles.addButton} 
-						onPress={() => setShowAddModal(true)}
+					<TouchableOpacity
+						style={styles.scanButton}
+						onPress={() => {
+							console.log("🔍 Navegando a pantalla de scanner...");
+							router.push("/otp-scanner?from=generator");
+						}}
 					>
-						<Text style={styles.addButtonText}>➕ Agregar</Text>
+						<Text style={styles.scanButtonText}>📷 Escanear QR</Text>
 					</TouchableOpacity>
 				</View>
 
-				<View style={styles.searchContainer}>
-					<TextInput
-						style={styles.searchInput}
-						value={searchQuery}
-						onChangeText={setSearchQuery}
-						placeholder="Buscar servidores..."
-						placeholderTextColor="#999"
-					/>
+				{/* Lista de códigos almacenados */}
+				{isLoading ? (
+					<View style={styles.loadingContainer}>
+						<Text style={styles.loadingText}>Cargando códigos...</Text>
+					</View>
+				) : storedCodes.length > 0 ? (
+					<ScrollView style={styles.codesList} showsVerticalScrollIndicator={false}>
+						{storedCodes.map((code) => (
+							<View key={code.id} style={styles.codeCard}>
+								<View style={styles.codeHeader}>
+									<Text style={styles.serverName}>{code.name}</Text>
+									<View style={[
+										styles.typeTag,
+										code.type === 'otp' ? styles.otpTag : styles.kuserTag
+									]}>
+										<Text style={styles.typeTagText}>{code.type.toUpperCase()}</Text>
+									</View>
 				</View>
 
-				<ScrollView style={styles.serversList}>
-					{filteredServers.map((server) => (
-						<View key={server.id} style={styles.serverCard}>
-							<View style={styles.serverHeader}>
-								<Text style={styles.serverName}>{server.name}</Text>
-								<View style={styles.otpTag}>
-									<Text style={styles.otpTagText}>OTP</Text>
+								<View style={styles.codeContent}>
+									<Text style={styles.codeValue}>{code.code}</Text>
+									<TouchableOpacity 
+										style={styles.copyButton}
+										onPress={() => handleCopyCode(code.code)}
+									>
+										<Text style={styles.copyButtonText}>📋</Text>
+									</TouchableOpacity>
 								</View>
-							</View>
-							<View style={styles.serverContent}>
-								<Text style={styles.otpCode}>{server.otpCode}</Text>
-								<TouchableOpacity 
-									style={styles.copyButton} 
-									onPress={() => copyToClipboard(server.otpCode, server.name)}
+								
+								<View style={styles.codeActions}>
+									{code.type === 'otp' && (
+										<TouchableOpacity 
+											style={[styles.actionButton, styles.activateButton]}
+											onPress={() => handleActivateCode(code.id)}
+										>
+											<Text style={styles.actionButtonText}>Activar</Text>
+										</TouchableOpacity>
+									)}
+									{code.type === 'kuser' && (
+										<TouchableOpacity 
+											style={[styles.actionButton, styles.approveButton]}
+											onPress={() => handleApproveCode(code.id)}
+										>
+											<Text style={styles.actionButtonText}>Aprobar</Text>
+										</TouchableOpacity>
+									)}
+									
+								<TouchableOpacity
+										style={[styles.actionButton, styles.deleteButton]}
+										onPress={() => handleDeleteCode(code.id)}
 								>
-									<Text style={styles.copyIcon}>📋</Text>
+										<Text style={styles.actionButtonText}>🗑️</Text>
 								</TouchableOpacity>
 							</View>
-							<Text style={styles.timer}>Tiempo restante: {server.timeLeft}s</Text>
+								
+								<Text style={styles.codeInfo}>
+									{code.label} • {code.timeLeft}s restantes
+							</Text>
 						</View>
 					))}
 				</ScrollView>
+				) : (
+					<View style={styles.emptyContainer}>
+						<Text style={styles.emptyText}>No hay códigos generados</Text>
+						<Text style={styles.emptySubtext}>Escanea un QR para generar tu primer código</Text>
+					</View>
+				)}
 
-				<TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+
+				<TouchableOpacity
+					style={styles.backButton}
+					onPress={() => router.back()}
+				>
 					<Text style={styles.backButtonText}>← Volver</Text>
 				</TouchableOpacity>
 			</View>
 
-			{/* Modal para agregar servidor */}
-			{showAddModal && (
-				<View style={styles.modalOverlay}>
-					<View style={styles.modal}>
-						<View style={styles.modalHeader}>
-							<Text style={styles.modalTitle}>Agregar Servidor</Text>
-							<TouchableOpacity onPress={() => setShowAddModal(false)}>
-								<Text style={styles.closeButton}>✕</Text>
-							</TouchableOpacity>
-						</View>
-						
-						<View style={styles.inputContainer}>
-							<Text style={styles.inputLabel}>Nombre del Servidor</Text>
-							<TextInput
-								style={styles.input}
-								value={newServerName}
-								onChangeText={setNewServerName}
-								placeholder="Ej: Servidor ABC"
-							/>
-						</View>
 
-						<View style={styles.inputContainer}>
-							<Text style={styles.inputLabel}>Semilla (Secret Key)</Text>
-							<TextInput
-								style={styles.input}
-								value={newSecretKey}
-								onChangeText={setNewSecretKey}
-								placeholder="Ej: ACSD-23556-38494"
-							/>
-						</View>
-
-						<TouchableOpacity style={styles.addServerButton} onPress={handleAddServer}>
-							<Text style={styles.addServerButtonText}>Agregar Servidor</Text>
-						</TouchableOpacity>
-					</View>
-				</View>
-			)}
 		</View>
 	);
 }
 
 const styles = StyleSheet.create({
-	container: { 
-		flex: 1, 
+	container: {
+		flex: 1,
 		backgroundColor: "white",
-		paddingHorizontal: 24
+		paddingHorizontal: 24,
 	},
 	header: {
 		paddingTop: 80,
 		alignItems: "center",
 	},
-	logo: { 
-		width: 160, 
-		height: 80, 
-		marginTop: 10 
+	logo: {
+		width: 160,
+		height: 80,
+		marginTop: 10,
 	},
 	content: {
 		flex: 1,
@@ -236,170 +291,159 @@ const styles = StyleSheet.create({
 		color: "#333",
 		flex: 1,
 	},
-	addButton: {
-		backgroundColor: "#1E78C6",
+	scanButton: {
+		backgroundColor: "#28a745",
 		paddingVertical: 8,
 		paddingHorizontal: 16,
-		borderRadius: 6,
+		borderRadius: 20,
+		...(Platform.OS === "web"
+			? { boxShadow: "0px 4px 12px rgba(40,167,69,0.3)" }
+			: { elevation: 4 }),
 	},
-	addButtonText: {
+	scanButtonText: {
 		color: "#fff",
 		fontSize: 14,
 		fontWeight: "600",
-	},
-	searchContainer: {
-		marginBottom: 20,
-	},
-	searchInput: {
-		borderWidth: 1,
-		borderColor: "#ddd",
-		borderRadius: 8,
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		fontSize: 16,
-		backgroundColor: "#f8f9fa",
-	},
-	serversList: {
-		flex: 1,
-		marginBottom: 20,
-	},
-	serverCard: {
-		backgroundColor: "#fff",
-		borderRadius: 12,
-		padding: 16,
-		marginBottom: 12,
-		borderWidth: 1,
-		borderColor: "#e9ecef",
-		shadowColor: "#000",
-		shadowOffset: {
-			width: 0,
-			height: 2,
-		},
-		shadowOpacity: 0.1,
-		shadowRadius: 3.84,
-		elevation: 5,
-	},
-	serverHeader: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		marginBottom: 12,
-	},
-	serverName: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#333",
-		flex: 1,
-	},
-	otpTag: {
-		backgroundColor: "#28a745",
-		paddingHorizontal: 8,
-		paddingVertical: 4,
-		borderRadius: 4,
-	},
-	otpTagText: {
-		color: "#fff",
-		fontSize: 12,
-		fontWeight: "600",
-	},
-	serverContent: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		marginBottom: 8,
-	},
-	otpCode: {
-		fontSize: 28,
-		fontWeight: "bold",
-		color: "#1E78C6",
-		letterSpacing: 2,
-		flex: 1,
-	},
-	copyButton: {
-		padding: 8,
-	},
-	copyIcon: {
-		fontSize: 20,
-	},
-	timer: {
-		fontSize: 14,
-		color: "#666",
 	},
 	backButton: {
 		backgroundColor: "#6c757d",
 		paddingVertical: 12,
 		paddingHorizontal: 32,
-		borderRadius: 8,
+		borderRadius: 20,
 		alignItems: "center",
+		...(Platform.OS === "web"
+			? { boxShadow: "0px 6px 16px rgba(108,117,125,0.3)" }
+			: { elevation: 4 }),
 	},
 	backButtonText: {
 		color: "#fff",
 		fontSize: 16,
 		fontWeight: "600",
 	},
-	// Estilos del modal
-	modalOverlay: {
-		position: "absolute",
-		top: 0,
-		left: 0,
-		right: 0,
-		bottom: 0,
-		backgroundColor: "rgba(0,0,0,0.5)",
+	
+	// Estilos para códigos almacenados
+	loadingContainer: {
+		flex: 1,
 		justifyContent: "center",
 		alignItems: "center",
+		paddingVertical: 40,
 	},
-	modal: {
+	loadingText: {
+		fontSize: 16,
+		color: "#666",
+	},
+	codesList: {
+		flex: 1,
+		marginTop: 20,
+	},
+	codeCard: {
 		backgroundColor: "#fff",
 		borderRadius: 12,
-		padding: 20,
-		width: "90%",
-		maxWidth: 400,
+		padding: 16,
+		marginBottom: 12,
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.1,
+		shadowRadius: 4,
+		elevation: 3,
+		borderWidth: 1,
+		borderColor: "#f0f0f0",
 	},
-	modalHeader: {
+	codeHeader: {
 		flexDirection: "row",
 		justifyContent: "space-between",
 		alignItems: "center",
-		marginBottom: 20,
+		marginBottom: 12,
 	},
-	modalTitle: {
+	serverName: {
 		fontSize: 18,
-		fontWeight: "bold",
-		color: "#333",
-	},
-	closeButton: {
-		fontSize: 24,
-		color: "#666",
-	},
-	inputContainer: {
-		marginBottom: 16,
-	},
-	inputLabel: {
-		fontSize: 14,
 		fontWeight: "600",
 		color: "#333",
+		flex: 1,
+	},
+	typeTag: {
+		paddingHorizontal: 8,
+		paddingVertical: 4,
+		borderRadius: 6,
+	},
+	otpTag: {
+		backgroundColor: "#e8f5e8",
+	},
+	kuserTag: {
+		backgroundColor: "#e8f0ff",
+	},
+	typeTagText: {
+		fontSize: 12,
+		fontWeight: "600",
+		color: "#00A86B",
+	},
+	codeContent: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginBottom: 12,
+	},
+	codeValue: {
+		fontSize: 24,
+		fontWeight: "700",
+		color: "#333",
+		flex: 1,
+		fontFamily: "monospace",
+	},
+	copyButton: {
+		padding: 8,
+		marginLeft: 12,
+	},
+	copyButtonText: {
+		fontSize: 18,
+	},
+	codeActions: {
+		flexDirection: "row",
+		gap: 8,
 		marginBottom: 8,
 	},
-	input: {
-		borderWidth: 1,
-		borderColor: "#ddd",
+	actionButton: {
+		paddingHorizontal: 16,
+		paddingVertical: 8,
 		borderRadius: 8,
-		paddingHorizontal: 12,
-		paddingVertical: 10,
-		fontSize: 16,
-		color: "#333",
-		backgroundColor: "#fff",
-	},
-	addServerButton: {
-		backgroundColor: "#1E78C6",
-		paddingVertical: 12,
-		paddingHorizontal: 24,
-		borderRadius: 8,
+		flex: 1,
 		alignItems: "center",
-		marginTop: 8,
 	},
-	addServerButtonText: {
+	activateButton: {
+		backgroundColor: "#ff4444",
+	},
+	approveButton: {
+		backgroundColor: "#333",
+	},
+	deleteButton: {
+		backgroundColor: "#666",
+		flex: 0,
+		paddingHorizontal: 12,
+	},
+	actionButtonText: {
 		color: "#fff",
-		fontSize: 16,
 		fontWeight: "600",
+		fontSize: 14,
+	},
+	codeInfo: {
+		fontSize: 12,
+		color: "#666",
+		textAlign: "center",
+	},
+	emptyContainer: {
+		flex: 1,
+		justifyContent: "center",
+		alignItems: "center",
+		paddingVertical: 60,
+	},
+	emptyText: {
+		fontSize: 18,
+		fontWeight: "600",
+		color: "#666",
+		marginBottom: 8,
+	},
+	emptySubtext: {
+		fontSize: 14,
+		color: "#999",
+		textAlign: "center",
 	},
 });

@@ -1,30 +1,56 @@
 "use client";
 import { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Image, type ImageSourcePropType, TextInput, Alert, Animated, Dimensions } from "react-native";
+import {
+	View,
+	Text,
+	StyleSheet,
+	TouchableOpacity,
+	Image,
+	type ImageSourcePropType,
+	TextInput,
+	Alert,
+	Animated,
+	Dimensions,
+	Platform,
+} from "react-native";
 import { useRouter } from "expo-router";
 import { sendOTP, getDeviceIMEI, createAccount } from "@/services/api";
 import LoadingButton from "@/components/LoadingButton";
 import { useDispatch } from "@/store";
-import { setPersonalData, setOTPSent, setOTPVerified, setAccountData } from "@/store/userSlice";
-import { CodeField, Cursor, useClearByFocusCell } from "react-native-confirmation-code-field";
+import {
+	setPersonalData,
+	setOTPSent,
+	setOTPVerified,
+	setAccountData,
+} from "@/store/userSlice";
+import {
+	CodeField,
+	Cursor,
+	useClearByFocusCell,
+} from "react-native-confirmation-code-field";
 
 export default function VerificationStartScreen() {
 	const router = useRouter();
 	const dispatch = useDispatch();
 	const [termsAccepted, setTermsAccepted] = useState(false);
-	const [currentStep, setCurrentStep] = useState<'start' | 'personal-data' | 'otp'>('start');
-	
+	const [currentStep, setCurrentStep] = useState<
+		"start" | "personal-data" | "otp"
+	>("start");
+
 	// Estados para datos personales
 	const [dni, setDni] = useState("");
 	const [email, setEmail] = useState("");
 	const [isLoadingPersonal, setIsLoadingPersonal] = useState(false);
-	
+
 	// Estados para OTP
 	const [otpCode, setOtpCode] = useState("");
 	const [isLoadingOTP, setIsLoadingOTP] = useState(false);
 	const [otpError, setOtpError] = useState(false);
-	const [props, getCellOnLayoutHandler] = useClearByFocusCell({ value: otpCode, setValue: setOtpCode });
-	
+	const [props, getCellOnLayoutHandler] = useClearByFocusCell({
+		value: otpCode,
+		setValue: setOtpCode,
+	});
+
 	// Animaciones
 	const [slideAnimation] = useState(new Animated.Value(0));
 
@@ -33,7 +59,7 @@ export default function VerificationStartScreen() {
 
 	const handleStartVerification = () => {
 		if (termsAccepted) {
-			setCurrentStep('personal-data');
+			setCurrentStep("personal-data");
 			// Animar el modal desde abajo
 			Animated.timing(slideAnimation, {
 				toValue: 1,
@@ -67,25 +93,31 @@ export default function VerificationStartScreen() {
 		try {
 			// Obtener IMEI del dispositivo
 			const imei = await getDeviceIMEI();
-			console.log('IMEI obtenido:', imei);
-			
+			console.log("IMEI obtenido:", imei);
+
 			// Guardar datos en Redux
-			dispatch(setPersonalData({
-				dni: dni.trim(),
+			dispatch(
+				setPersonalData({
+					dni: dni.trim(),
+					email: email.trim(),
+					imei: imei,
+				}),
+			);
+
+			console.log("Enviando OTP...", {
 				email: email.trim(),
-				imei: imei
-			}));
-			
-			console.log('Enviando OTP...', { email: email.trim(), dni: dni.trim(), imei });
-			
+				dni: dni.trim(),
+				imei,
+			});
+
 			// Enviar OTP
 			const response = await sendOTP({
 				email: email.trim(),
 				dni: dni.trim(),
-				imei: imei
+				imei: imei,
 			});
 
-			console.log('Respuesta del API:', response);
+			console.log("Respuesta del API:", response);
 
 			// Marcar OTP como enviado
 			dispatch(setOTPSent(true));
@@ -103,15 +135,14 @@ export default function VerificationStartScreen() {
 					useNativeDriver: true,
 				}),
 			]).start(() => {
-				setCurrentStep('otp');
+				setCurrentStep("otp");
 			});
-			
 		} catch (error) {
-			console.error('Error sending OTP:', error);
+			console.error("Error sending OTP:", error);
 			Alert.alert(
-				"Error", 
+				"Error",
 				"No se pudo enviar el código de verificación. Por favor intenta nuevamente.",
-				[{ text: "OK" }]
+				[{ text: "OK" }],
 			);
 		} finally {
 			setIsLoadingPersonal(false);
@@ -125,7 +156,10 @@ export default function VerificationStartScreen() {
 		}
 
 		if (!email || !dni) {
-			Alert.alert("Error", "Datos de usuario no encontrados. Por favor regrese al paso anterior.");
+			Alert.alert(
+				"Error",
+				"Datos de usuario no encontrados. Por favor regrese al paso anterior.",
+			);
 			return;
 		}
 
@@ -133,72 +167,84 @@ export default function VerificationStartScreen() {
 		setOtpError(false); // Limpiar error previo
 
 		try {
-			console.log('=== INICIANDO VERIFICACIÓN ===');
-			console.log('Verificando OTP:', { email, otp: otpCode, dni });
+			console.log("=== INICIANDO VERIFICACIÓN ===");
+			console.log("Verificando OTP:", { email, otp: otpCode, dni });
 
 			const imei = await getDeviceIMEI();
 			const response = await createAccount({
 				email,
 				otp: otpCode,
-				imei
+				imei,
 			});
 
-			console.log('=== RESPUESTA RECIBIDA ===');
-			console.log('Respuesta completa:', response);
-			console.log('response.response:', (response as any).response);
-			console.log('response.response.isValid:', (response as any).response?.isValid);
-			console.log('response.response.address:', (response as any).response?.address);
+			console.log("=== RESPUESTA RECIBIDA ===");
+			console.log("Respuesta completa:", response);
+			console.log("response.response:", (response as any).response);
+			console.log(
+				"response.response.isValid:",
+				(response as any).response?.isValid,
+			);
+			console.log(
+				"response.response.address:",
+				(response as any).response?.address,
+			);
 
 			// Verificar si el OTP es válido - más flexible para APIs de prueba
-			console.log('=== VERIFICANDO VALIDEZ ===');
-			const isValid = (response as any).code === 200 || 
-				(response as any).response?.isValid === 'true' || 
+			console.log("=== VERIFICANDO VALIDEZ ===");
+			const isValid =
+				(response as any).code === 200 ||
+				(response as any).response?.isValid === "true" ||
 				(response as any).response?.address ||
 				(response as any).response?.isValid === true;
-			console.log('isValid result:', isValid);
-			
+			console.log("isValid result:", isValid);
+
 			if (isValid) {
-				console.log('=== OTP VÁLIDO - PROCESANDO ÉXITO ===');
-				
+				console.log("=== OTP VÁLIDO - PROCESANDO ÉXITO ===");
+
 				// Guardar datos de la cuenta
-				dispatch(setAccountData({
-					address: (response as any).response?.address,
-					f1: (response as any).response?.f1
-				}));
+				dispatch(
+					setAccountData({
+						address: (response as any).response?.address,
+						f1: (response as any).response?.f1,
+					}),
+				);
 
 				// Marcar OTP como verificado
 				dispatch(setOTPVerified(true));
 
-				console.log('Navegando a qr-display...');
-				router.push("/qr-display");
+				console.log("Navegando a qr-scanner...");
+				router.push("/qr-scanner");
 			} else {
-				console.log('=== OTP INVÁLIDO ===');
+				console.log("=== OTP INVÁLIDO ===");
 				setOtpError(true);
 				setOtpCode(""); // Limpiar el código incorrecto
-				
+
 				Alert.alert(
 					"❌ Código incorrecto",
 					"El código OTP ingresado no es válido. Por favor verifica el código y intenta nuevamente.",
-					[{ 
-						text: "Entendido", 
-						onPress: () => setOtpError(false)
-					}]
+					[
+						{
+							text: "Entendido",
+							onPress: () => setOtpError(false),
+						},
+					],
 				);
 			}
-			
 		} catch (error) {
-			console.log('=== ERROR EN VERIFICACIÓN ===');
-			console.error('Error verifying OTP:', error);
+			console.log("=== ERROR EN VERIFICACIÓN ===");
+			console.error("Error verifying OTP:", error);
 			setOtpError(true);
 			setOtpCode(""); // Limpiar el código en caso de error
-			
+
 			Alert.alert(
 				"❌ Error de conexión",
 				"No se pudo verificar el código. Por favor intenta nuevamente.",
-				[{ 
-					text: "OK", 
-					onPress: () => setOtpError(false)
-				}]
+				[
+					{
+						text: "OK",
+						onPress: () => setOtpError(false),
+					},
+				],
 			);
 		} finally {
 			setIsLoadingOTP(false);
@@ -206,19 +252,19 @@ export default function VerificationStartScreen() {
 	};
 
 	const goBack = () => {
-		if (currentStep === 'personal-data') {
-			setCurrentStep('start');
+		if (currentStep === "personal-data") {
+			setCurrentStep("start");
 			Animated.timing(slideAnimation, {
 				toValue: 0,
 				duration: 300,
 				useNativeDriver: true,
 			}).start();
-		} else if (currentStep === 'otp') {
-			setCurrentStep('personal-data');
+		} else if (currentStep === "otp") {
+			setCurrentStep("personal-data");
 		}
 	};
 
-	const screenHeight = Dimensions.get('window').height;
+	const screenHeight = Dimensions.get("window").height;
 
 	return (
 		<View style={styles.container}>
@@ -227,22 +273,26 @@ export default function VerificationStartScreen() {
 				<Image source={bg} style={styles.hero} resizeMode="contain" />
 			</View>
 
-			{currentStep === 'start' && (
+			{currentStep === "start" && (
 				<>
 					<Text style={styles.title}>Por favor, verifique su identidad</Text>
 
-					<TouchableOpacity 
-						style={styles.checkboxContainer} 
+					<TouchableOpacity
+						style={styles.checkboxContainer}
 						onPress={() => setTermsAccepted(!termsAccepted)}
 					>
-						<View style={[styles.checkbox, termsAccepted && styles.checkboxChecked]}>
+						<View
+							style={[styles.checkbox, termsAccepted && styles.checkboxChecked]}
+						>
 							{termsAccepted && <Text style={{ fontSize: 16 }}>✅</Text>}
 						</View>
-						<Text style={styles.checkboxText}>Acepto términos y condiciones</Text>
+						<Text style={styles.checkboxText}>
+							Acepto términos y condiciones
+						</Text>
 					</TouchableOpacity>
 
-					<TouchableOpacity 
-						style={[styles.button, !termsAccepted && styles.buttonDisabled]} 
+					<TouchableOpacity
+						style={[styles.button, !termsAccepted && styles.buttonDisabled]}
 						onPress={handleStartVerification}
 						disabled={!termsAccepted}
 					>
@@ -252,24 +302,28 @@ export default function VerificationStartScreen() {
 			)}
 
 			{/* Modal deslizable para datos personales */}
-			{(currentStep === 'personal-data' || currentStep === 'otp') && (
-				<Animated.View 
+			{(currentStep === "personal-data" || currentStep === "otp") && (
+				<Animated.View
 					style={[
 						styles.modal,
 						{
-							transform: [{
-								translateY: slideAnimation.interpolate({
-									inputRange: [0, 1],
-									outputRange: [screenHeight, 0],
-								})
-							}]
-						}
+							transform: [
+								{
+									translateY: slideAnimation.interpolate({
+										inputRange: [0, 1],
+										outputRange: [screenHeight, 0],
+									}),
+								},
+							],
+						},
 					]}
 				>
-					{currentStep === 'personal-data' && (
+					{currentStep === "personal-data" && (
 						<>
 							<View style={styles.modalHeader}>
-								<Text style={styles.modalTitle}>Ingrese sus datos personales</Text>
+								<Text style={styles.modalTitle}>
+									Ingrese sus datos personales
+								</Text>
 								<TouchableOpacity onPress={goBack}>
 									<Text style={{ fontSize: 24 }}>✕</Text>
 								</TouchableOpacity>
@@ -310,10 +364,13 @@ export default function VerificationStartScreen() {
 						</>
 					)}
 
-					{currentStep === 'otp' && (
+					{currentStep === "otp" && (
 						<>
 							<View style={styles.modalHeader}>
-								<Text style={styles.modalTitle}>Ingrese el código de 6 dígitos que se le ha enviado a su correo electrónico</Text>
+								<Text style={styles.modalTitle}>
+									Ingrese el código de 6 dígitos que se le ha enviado a su
+									correo electrónico
+								</Text>
 								<TouchableOpacity onPress={goBack}>
 									<Text style={{ fontSize: 24 }}>✕</Text>
 								</TouchableOpacity>
@@ -334,9 +391,9 @@ export default function VerificationStartScreen() {
 										<Text
 											key={index}
 											style={[
-												styles.cell, 
+												styles.cell,
 												isFocused && styles.focusCell,
-												otpError && styles.errorCell
+												otpError && styles.errorCell,
 											]}
 											onLayout={getCellOnLayoutHandler(index)}
 										>
@@ -369,27 +426,27 @@ export default function VerificationStartScreen() {
 }
 
 const styles = StyleSheet.create({
-	container: { 
-		flex: 1, 
-		justifyContent: "flex-start", 
-		alignItems: "center", 
-		backgroundColor: "#fff", 
-		paddingHorizontal: 24 
+	container: {
+		flex: 1,
+		justifyContent: "flex-start",
+		alignItems: "center",
+		backgroundColor: "#fff",
+		paddingHorizontal: 24,
 	},
-	logo: { 
-		width: 160, 
-		height: 80, 
-		marginTop: 50 
+	logo: {
+		width: 160,
+		height: 80,
+		marginTop: 50,
 	},
-	heroWrap: { 
-		width: "86%", 
-		height: 280, 
-		marginTop: 12, 
-		position: "relative" 
+	heroWrap: {
+		width: "86%",
+		height: 280,
+		marginTop: 12,
+		position: "relative",
 	},
-	hero: { 
-		width: "100%", 
-		height: "100%" 
+	hero: {
+		width: "100%",
+		height: "100%",
 	},
 	title: {
 		fontSize: 18,
@@ -405,11 +462,11 @@ const styles = StyleSheet.create({
 		marginBottom: 30,
 	},
 	checkbox: {
-		width: 20,
-		height: 20,
+		width: 22,
+		height: 22,
 		borderWidth: 2,
 		borderColor: "#1E78C6",
-		borderRadius: 4,
+		borderRadius: 6,
 		marginRight: 12,
 		justifyContent: "center",
 		alignItems: "center",
@@ -425,8 +482,11 @@ const styles = StyleSheet.create({
 		backgroundColor: "#1E78C6",
 		paddingVertical: 16,
 		paddingHorizontal: 32,
-		borderRadius: 8,
+		borderRadius: 25,
 		minWidth: 200,
+		...(Platform.OS === "web"
+			? { boxShadow: "0px 8px 20px rgba(30,120,198,0.3)" }
+			: { elevation: 6 }),
 	},
 	buttonDisabled: {
 		backgroundColor: "#ccc",
@@ -438,14 +498,14 @@ const styles = StyleSheet.create({
 		textAlign: "center",
 	},
 	// Estilos para el modal deslizable
-	modal: { 
-		position: "absolute", 
-		left: 0, 
-		right: 0, 
-		bottom: 0, 
-		backgroundColor: "#fff", 
-		borderTopLeftRadius: 24, 
-		borderTopRightRadius: 24, 
+	modal: {
+		position: "absolute",
+		left: 0,
+		right: 0,
+		bottom: 0,
+		backgroundColor: "#fff",
+		borderTopLeftRadius: 24,
+		borderTopRightRadius: 24,
 		padding: 24,
 		paddingBottom: 40, // Agregar padding extra en la parte inferior
 		minHeight: 300,
@@ -458,38 +518,39 @@ const styles = StyleSheet.create({
 		shadowRadius: 3.84,
 		elevation: 5,
 	},
-	modalHeader: { 
-		flexDirection: "row", 
-		justifyContent: "space-between", 
-		alignItems: "center", 
-		marginBottom: 20 
+	modalHeader: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		marginBottom: 20,
 	},
-	modalTitle: { 
-		fontSize: 16, 
-		fontWeight: "600", 
-		color: "#666", 
-		flex: 1, 
-		marginRight: 16 
+	modalTitle: {
+		fontSize: 16,
+		fontWeight: "600",
+		color: "#666",
+		flex: 1,
+		marginRight: 16,
 	},
-	inputContainer: { 
-		marginBottom: 20 
+	inputContainer: {
+		marginBottom: 20,
 	},
-	inputLabel: { 
-		fontSize: 16, 
-		fontWeight: "500", 
-		color: "#333", 
-		marginBottom: 8 
+	inputLabel: {
+		fontSize: 16,
+		fontWeight: "500",
+		color: "#333",
+		marginBottom: 8,
 	},
-	input: { 
-		borderWidth: 2, 
-		borderColor: "#E3F2FD", 
-		borderRadius: 8, 
-		paddingHorizontal: 16, 
-		paddingVertical: 12, 
-		fontSize: 16, 
-		color: "#333" 
+	input: {
+		borderWidth: 2,
+		borderColor: "#E3F2FD",
+		borderRadius: 12,
+		paddingHorizontal: 16,
+		paddingVertical: 14,
+		fontSize: 16,
+		color: "#333",
+		backgroundColor: "#fff",
 	},
-	codeContainer: { 
+	codeContainer: {
 		marginBottom: 30,
 		alignItems: "center",
 	},
@@ -502,7 +563,7 @@ const styles = StyleSheet.create({
 		borderWidth: 2,
 		borderColor: "#E3F2FD",
 		textAlign: "center",
-		borderRadius: 8,
+		borderRadius: 12,
 		color: "#333",
 		backgroundColor: "#fff",
 		marginHorizontal: 4,
@@ -517,6 +578,7 @@ const styles = StyleSheet.create({
 	},
 	focusCell: {
 		borderColor: "#1E78C6",
+		backgroundColor: "#E3F2FD",
 	},
 	errorCell: {
 		borderColor: "#FF4444",
